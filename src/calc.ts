@@ -1,4 +1,5 @@
 import type { Carte, Cycle, CycleId, Depense, FinanceData, Holding } from './types';
+import { CELI_PLAFONDS_OFFICIELS } from './types';
 
 export const money = (n: number): string => {
   const sign = n < 0 ? '\u2212 ' : '';
@@ -119,6 +120,101 @@ export const analysePortefeuille = (data: FinanceData): {
   return { positions, total, prochaineContribution };
 };
 
+// ---------- CELI (plafond partagé selon date de naissance + historique) ----------
+
+export const celiAnneeEligible = (naissance: string, today = new Date()): number => {
+  const anneeMin = 2009; // création du CELI
+  if (!naissance) return anneeMin;
+  const parts = naissance.split('-');
+  const y = Number(parts[0]);
+  if (!y) return anneeMin;
+  // droit à cotiser dès l'année où on a 18 ans
+  return Math.max(anneeMin, y + 18);
+};
+
+export const celiPlafondAnnuel = (data: FinanceData, annee: number): number => {
+  const custom = data.celi.plafondsAnnuels?.[annee];
+  if (typeof custom === 'number') return custom;
+  return CELI_PLAFONDS_OFFICIELS[annee] ?? 0;
+};
+
+export const celiPlafondCumule = (data: FinanceData, today = new Date()): number => {
+  const anneeCourante = today.getFullYear();
+  const debut = celiAnneeEligible(data.celi.naissance, today);
+  let s = 0;
+  for (let y = debut; y <= anneeCourante; y++) s += celiPlafondAnnuel(data, y);
+  return s;
+};
+
+export const celiCotisationsCumulees = (data: FinanceData, today = new Date()): number => {
+  const anneeCourante = today.getFullYear();
+  let s = 0;
+  for (const [k, v] of Object.entries(data.celi.cotisations ?? {})) {
+    if (Number(k) <= anneeCourante) s += v || 0;
+  }
+  return s;
+};
+
+export const celiDisponible = (data: FinanceData, today = new Date()): number =>
+  celiPlafondCumule(data, today) - celiCotisationsCumulees(data, today);
+
+export const celiCotiseCetteAnnee = (data: FinanceData, today = new Date()): number =>
+  data.celi.cotisations?.[today.getFullYear()] ?? 0;
+
+// Mappe l'id d'un compte vers le libellé « compte » utilisé dans les holdings
+const LABEL_HOLDING: Record<string, string> = {
+  celiapp: 'CELIAPP',
+  celi: 'CELI',
+  celi_enfant: 'CELI enfant',
+  crypto: 'Wealthsimple',
+};
+
+export const valeurCompte = (data: FinanceData, compteId: string): number => {
+  const label = LABEL_HOLDING[compteId];
+  const desHoldings = data.holdings.filter((h) => h.compte === label);
+  if (desHoldings.length > 0) {
+    return desHoldings.reduce((s, h) => s + h.actions * h.prix, 0);
+  }
+  const compte = data.comptes.find((c) => c.id === compteId);
+  return compte?.valeur ?? 0;
+};
+
+export const celiValeurTotale = (data: FinanceData): number =>
+  valeurCompte(data, 'celi') + valeurCompte(data, 'celi_enfant');
+
+// ---------- Avoir total ----------
+
+export type PartAvoir = {
+  cle: string;
+  nom: string;
+  valeur: number;
+  poids: number;
+  couleur: string;
+};
+
+const COULEURS_AVOIR: Record<string, string> = {
+  celiapp: '#1d2d3d',
+  celi: '#416180',
+  celi_enfant: '#5980a6',
+  crypto: '#94bce3',
+  coussin: '#d6ebff',
+};
+
+export const avoirTotal = (data: FinanceData): { total: number; parts: PartAvoir[] } => {
+  const parts: PartAvoir[] = [];
+  data.comptes.forEach((c) => {
+    const v = valeurCompte(data, c.id);
+    if (v > 0) parts.push({ cle: c.id, nom: c.nom, valeur: v, poids: 0, couleur: COULEURS_AVOIR[c.id] ?? '#5980a6' });
+  });
+  if (data.coussin.actuel > 0) {
+    parts.push({ cle: 'coussin', nom: 'Fond d\u2019urgence', valeur: data.coussin.actuel, poids: 0, couleur: COULEURS_AVOIR.coussin });
+  }
+  const total = parts.reduce((s, p) => s + p.valeur, 0);
+  parts.forEach((p) => (p.poids = total > 0 ? p.valeur / total : 0));
+  parts.sort((a, b) => b.valeur - a.valeur);
+  return { total, parts };
+};
+
 export type Alerte = {
   id: string;
   titre: string;
@@ -161,6 +257,7 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
     });
   }
   data.comptes.forEach((c) => {
+    if (c.id === 'celi' || c.id === 'celi_enfant') return; // géré à part
     if (c.plafondAnnuel > 0) {
       const restant = c.plafondAnnuel - c.annee;
       if (restant < 1000 && restant >= 0) {
@@ -181,6 +278,24 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
       }
     }
   });
+  if (data.celi.naissance) {
+    const dispo = celiDisponible(data, today);
+    if (dispo < 0) {
+      out.push({
+        id: 'celi-depasse',
+        titre: 'CELI : plafond dépassé',
+        detail: `Tu as cotisé ${money(-dispo)} de trop dans tes CELI (tous comptes confondus). Pénalité de 1 % par mois sur le trop-plein.`,
+        cible: 'plafonds',
+      });
+    } else if (dispo < 1000) {
+      out.push({
+        id: 'celi-presque',
+        titre: 'CELI : bientôt plein',
+        detail: `Il te reste ${money(dispo)} de droits CELI (partagés entre tes deux comptes).`,
+        cible: 'plafonds',
+      });
+    }
+  }
   return out;
 };
 

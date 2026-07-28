@@ -10,6 +10,7 @@ const NOM_COMPTES: Record<CompteSrc, string> = {
   credit: 'Carte de crédit',
   CELIAPP: 'CELIAPP',
   CELI: 'CELI',
+  CELI_ENFANT: 'CELI enfant',
   wealthsimple: 'Wealthsimple',
 };
 
@@ -21,7 +22,7 @@ const NOM_CAT: Record<Categorie, string> = {
   dette: 'Dette',
 };
 
-const COMPTES_LIST: CompteSrc[] = ['cheques', 'credit', 'CELIAPP', 'CELI', 'wealthsimple'];
+const COMPTES_LIST: CompteSrc[] = ['cheques', 'credit', 'CELIAPP', 'CELI', 'CELI_ENFANT', 'wealthsimple'];
 const CAT_LIST: Categorie[] = ['fixe', 'variable', 'investissement', 'epargne', 'dette'];
 
 const uid = () => 'd' + Math.random().toString(36).slice(2, 9);

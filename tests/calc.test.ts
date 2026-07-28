@@ -98,11 +98,12 @@ t('portefeuille: prorata when needs exceed contribution', () => {
 });
 
 t('portefeuille: no achat when already balanced', () => {
+  // On teste sur le portefeuille adulte seul (le CELI enfant a son propre pool)
+  const adulte = DEFAULT_DATA.holdings.filter((h) => h.compte !== 'CELI enfant');
   const data = {
     ...DEFAULT_DATA,
-    holdings: DEFAULT_DATA.holdings.map((h) => ({ ...h, actions: h.cible * 1000, prix: 1, cible: h.cible })),
+    holdings: adulte.map((h) => ({ ...h, actions: h.cible * 1000, prix: 1, cible: h.cible })),
   };
-  // Force perfectly balanced portfolio (approximation)
   const total = data.holdings.reduce((s, h) => s + h.actions * h.prix, 0);
   data.holdings = data.holdings.map((h) => ({ ...h, actions: total * h.cible }));
   const { positions } = analysePortefeuille(data);

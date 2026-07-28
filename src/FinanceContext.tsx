@@ -15,29 +15,39 @@ type Ctx = {
   setData: (updater: (d: FinanceData) => FinanceData) => void;
   loading: boolean;
   saving: boolean;
+  reset: () => void;
 };
 
 const FinanceContext = createContext<Ctx | null>(null);
 
+const KEY = 'cyclepay.finance.v1';
+
+const merge = (loaded: Partial<FinanceData>): FinanceData => ({
+  ...DEFAULT_DATA,
+  ...loaded,
+  celi: { ...DEFAULT_DATA.celi, ...(loaded.celi ?? {}) },
+  reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
+  coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },
+  carte: { ...DEFAULT_DATA.carte, ...(loaded.carte ?? {}) },
+});
+
+const chargerInitial = (): FinanceData => {
+  try {
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
+    if (!raw) return DEFAULT_DATA;
+    return merge(JSON.parse(raw));
+  } catch {
+    return DEFAULT_DATA;
+  }
+};
+
 export const FinanceDataProvider = ({ children }: { children: ReactNode }) => {
-  const [data, setDataState] = useState<FinanceData>(DEFAULT_DATA);
-  const [loading, setLoading] = useState(true);
+  const [data, setDataState] = useState<FinanceData>(chargerInitial);
   const [saving, setSaving] = useState(false);
   const timer = useRef<number | null>(null);
   const firstLoad = useRef(true);
 
   useEffect(() => {
-    fetch('/api/finance')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (json) setDataState(json as FinanceData);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (loading) return;
     if (firstLoad.current) {
       firstLoad.current = false;
       return;
@@ -45,25 +55,34 @@ export const FinanceDataProvider = ({ children }: { children: ReactNode }) => {
     if (timer.current) window.clearTimeout(timer.current);
     setSaving(true);
     timer.current = window.setTimeout(() => {
-      fetch('/api/finance', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-        .catch(() => {})
-        .finally(() => setSaving(false));
-    }, 800);
+      try {
+        window.localStorage.setItem(KEY, JSON.stringify(data));
+      } catch {
+        // stockage plein ou bloqué — on abandonne silencieusement
+      }
+      setSaving(false);
+    }, 300);
     return () => {
       if (timer.current) window.clearTimeout(timer.current);
     };
-  }, [data, loading]);
+  }, [data]);
 
   const setData = useCallback(
     (updater: (d: FinanceData) => FinanceData) => setDataState((d) => updater(d)),
     [],
   );
 
-  const value = useMemo(() => ({ data, setData, loading, saving }), [data, setData, loading, saving]);
+  const reset = useCallback(() => {
+    try {
+      window.localStorage.removeItem(KEY);
+    } catch {}
+    setDataState(DEFAULT_DATA);
+  }, []);
+
+  const value = useMemo(
+    () => ({ data, setData, loading: false, saving, reset }),
+    [data, setData, saving, reset],
+  );
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
 };
 

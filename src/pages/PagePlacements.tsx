@@ -1,5 +1,5 @@
 import { useFinance } from '../FinanceContext';
-import { money } from '../calc';
+import { money, valeurCompte } from '../calc';
 import { PageHeader } from '../App';
 import { Card } from '../ui';
 import type { CompteInvest } from '../types';
@@ -7,7 +7,7 @@ import type { CompteInvest } from '../types';
 export const PagePlacements = () => {
   const { data, setData } = useFinance();
 
-  const total = data.comptes.reduce((s, c) => s + c.valeur, 0);
+  const total = data.comptes.reduce((s, c) => s + valeurCompte(data, c.id), 0);
   const mensuel = data.comptes.reduce((s, c) => s + c.parCycle * 2, 0);
 
   const setCompte = (id: CompteInvest['id'], patch: Partial<CompteInvest>) =>
@@ -38,23 +38,44 @@ export const PagePlacements = () => {
       </Card>
 
       <div className="grid grid-auto-300 gap-20" style={{ marginBottom: 24 }}>
-        {data.comptes.map((c) => (
-          <Card key={c.id} plus="br">
-            <div className="cd" style={{ fontWeight: 700, fontSize: 30, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              {c.nom}
-            </div>
-            <div className="muted" style={{ fontSize: 16, marginTop: 2 }}>{c.simple}</div>
-            <div className="mono-cond" style={{ fontSize: 38, marginTop: 16 }}>{money(c.valeur)}</div>
-            <label className="field mt-14">
-              <span className="field__label">À chaque paie, j'ajoute ($)</span>
-              <input className="field__input" style={{ fontSize: 24 }} inputMode="numeric" value={c.parCycle}
-                onChange={(e) => setCompte(c.id, { parCycle: Number(e.target.value) || 0 })} />
-            </label>
-            <div className="blue mt-10" style={{ fontSize: 16 }}>
-              = {money(c.parCycle * 2)} par mois · {money(c.parCycle * 24)} par année
-            </div>
-          </Card>
-        ))}
+        {data.comptes.map((c) => {
+          const valeur = valeurCompte(data, c.id);
+          const aHoldings = data.holdings.some(
+            (h) =>
+              (c.id === 'celiapp' && h.compte === 'CELIAPP') ||
+              (c.id === 'celi' && h.compte === 'CELI') ||
+              (c.id === 'celi_enfant' && h.compte === 'CELI enfant') ||
+              (c.id === 'crypto' && h.compte === 'Wealthsimple'),
+          );
+          return (
+            <Card key={c.id} plus="br">
+              <div className="cd" style={{ fontWeight: 700, fontSize: 30, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                {c.nom}
+              </div>
+              <div className="muted" style={{ fontSize: 16, marginTop: 2 }}>{c.simple}</div>
+              <div className="mono-cond" style={{ fontSize: 38, marginTop: 16 }}>{money(valeur)}</div>
+              {aHoldings ? (
+                <div className="subtle mt-6" style={{ fontSize: 14 }}>
+                  Calculé depuis tes actifs (quantité × prix) dans « Portefeuille ».
+                </div>
+              ) : (
+                <label className="field mt-10">
+                  <span className="field__label">Valeur actuelle ($)</span>
+                  <input className="field__input" style={{ fontSize: 22 }} inputMode="decimal" value={c.valeur}
+                    onChange={(e) => setCompte(c.id, { valeur: Number(e.target.value) || 0 })} />
+                </label>
+              )}
+              <label className="field mt-14">
+                <span className="field__label">À chaque paie, j'ajoute ($)</span>
+                <input className="field__input" style={{ fontSize: 24 }} inputMode="numeric" value={c.parCycle}
+                  onChange={(e) => setCompte(c.id, { parCycle: Number(e.target.value) || 0 })} />
+              </label>
+              <div className="blue mt-10" style={{ fontSize: 16 }}>
+                = {money(c.parCycle * 2)} par mois · {money(c.parCycle * 24)} par année
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       <div style={{ border: '1px solid #cfd3d7', padding: 24 }} className="grid grid-auto-260 gap-24 center">

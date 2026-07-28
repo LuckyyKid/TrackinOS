@@ -11,6 +11,7 @@ import { PagePlafonds } from './pages/PagePlafonds';
 import { PagePortefeuille } from './pages/PagePortefeuille';
 import { PageAvenir } from './pages/PageAvenir';
 import { PageCalendrier } from './pages/PageCalendrier';
+import { PageAvoir } from './pages/PageAvoir';
 
 export type PageId =
   | 'accueil'
@@ -21,6 +22,7 @@ export type PageId =
   | 'placements'
   | 'plafonds'
   | 'portefeuille'
+  | 'avoir'
   | 'avenir'
   | 'calendrier';
 
@@ -33,8 +35,9 @@ const TABS: Array<{ id: PageId; num: string; label: string }> = [
   { id: 'placements', num: '06', label: 'Mes placements' },
   { id: 'plafonds', num: '07', label: 'Mes plafonds' },
   { id: 'portefeuille', num: '08', label: 'Portefeuille' },
-  { id: 'avenir', num: '09', label: 'Mon avenir' },
-  { id: 'calendrier', num: '10', label: 'Calendrier' },
+  { id: 'avoir', num: '09', label: 'Avoir total' },
+  { id: 'avenir', num: '10', label: 'Mon avenir' },
+  { id: 'calendrier', num: '11', label: 'Calendrier' },
 ];
 
 export const App = () => {
@@ -99,6 +102,7 @@ const PageSwitch = ({ page, go }: { page: PageId; go: (p: PageId) => void }) => 
     case 'placements': return <PagePlacements />;
     case 'plafonds': return <PagePlafonds />;
     case 'portefeuille': return <PagePortefeuille />;
+    case 'avoir': return <PageAvoir />;
     case 'avenir': return <PageAvenir />;
     case 'calendrier': return <PageCalendrier />;
   }
