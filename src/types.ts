@@ -53,12 +53,16 @@ export type CompteInvest = {
 };
 
 export type Holding = {
+  id: string;
   ticker: string;
   compte: string;
   actions: number;
   prix: number;
   cible: number; // 0..1
 };
+
+export const COMPTES_HOLDING = ['CELIAPP', 'CELI', 'CELI enfant', 'Wealthsimple'] as const;
+export type CompteHolding = (typeof COMPTES_HOLDING)[number];
 
 export type Reequilibrage = {
   tolerance: number; // pourcentage
@@ -70,6 +74,12 @@ export type CeliConfig = {
   anneeDebutCotisation: number; // ex: 2020 (0 = pas encore renseigné)
   plafondsAnnuels: Record<number, number>; // par année, éditables
   cotisations: Record<number, number>; // total cotisé cette année-là, tous comptes CELI confondus
+};
+
+export type CeliappConfig = {
+  anneeDebutCotisation: number;
+  cotisations: Record<number, number>;
+  plafondVie: number; // 40 000 $ par défaut
 };
 
 // Plafonds officiels CRA du CELI par année
@@ -93,6 +103,7 @@ export type FinanceData = {
   reequilibrage: Reequilibrage;
   rendementAnnuel: number;
   celi: CeliConfig;
+  celiapp: CeliappConfig;
 };
 
 export const DEFAULT_DATA: FinanceData = {
@@ -133,10 +144,10 @@ export const DEFAULT_DATA: FinanceData = {
     { id: 'crypto', nom: 'Crypto', simple: 'Placements Wealthsimple', valeur: 4301, parCycle: 50, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0 },
   ],
   holdings: [
-    { ticker: 'SPUS', compte: 'CELI', actions: 0, prix: 0, cible: 0.40 },
-    { ticker: 'UPRO', compte: 'CELI', actions: 0, prix: 0, cible: 0.20 },
-    { ticker: 'XEF', compte: 'CELI', actions: 0, prix: 0, cible: 0.40 },
-    { ticker: 'XEQT', compte: 'CELI enfant', actions: 0, prix: 0, cible: 1.00 },
+    { id: 'h_spus_celi', ticker: 'SPUS', compte: 'CELI', actions: 0, prix: 0, cible: 0.40 },
+    { id: 'h_upro_celi', ticker: 'UPRO', compte: 'CELI', actions: 0, prix: 0, cible: 0.20 },
+    { id: 'h_xef_celi', ticker: 'XEF', compte: 'CELI', actions: 0, prix: 0, cible: 0.40 },
+    { id: 'h_xeqt_enfant', ticker: 'XEQT', compte: 'CELI enfant', actions: 0, prix: 0, cible: 1.00 },
   ],
   reequilibrage: { tolerance: 5, horizon: 3 },
   rendementAnnuel: 6.5,
@@ -145,5 +156,10 @@ export const DEFAULT_DATA: FinanceData = {
     anneeDebutCotisation: 0,
     plafondsAnnuels: { ...CELI_PLAFONDS_OFFICIELS },
     cotisations: {},
+  },
+  celiapp: {
+    anneeDebutCotisation: 0,
+    cotisations: {},
+    plafondVie: 40000,
   },
 };

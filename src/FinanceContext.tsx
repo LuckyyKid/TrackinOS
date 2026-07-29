@@ -22,13 +22,21 @@ const FinanceContext = createContext<Ctx | null>(null);
 
 const KEY = 'cyclepay.finance.v1';
 
+const uid = (): string =>
+  'h_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+
 const merge = (loaded: Partial<FinanceData>): FinanceData => ({
   ...DEFAULT_DATA,
   ...loaded,
   celi: { ...DEFAULT_DATA.celi, ...(loaded.celi ?? {}) },
+  celiapp: { ...DEFAULT_DATA.celiapp, ...(loaded.celiapp ?? {}) },
   reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
   coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },
   carte: { ...DEFAULT_DATA.carte, ...(loaded.carte ?? {}) },
+  holdings: (loaded.holdings ?? DEFAULT_DATA.holdings).map((h) => ({
+    ...h,
+    id: h.id ?? uid(),
+  })),
 });
 
 const chargerInitial = (): FinanceData => {

@@ -182,6 +182,25 @@ export const valeurCompte = (data: FinanceData, compteId: string): number => {
 export const celiValeurTotale = (data: FinanceData): number =>
   valeurCompte(data, 'celi') + valeurCompte(data, 'celi_enfant');
 
+// ---------- CELIAPP (plafond à vie seulement, historique de cotisations) ----------
+
+export const celiappCotisationsCumulees = (data: FinanceData, today = new Date()): number => {
+  const anneeCourante = today.getFullYear();
+  let s = 0;
+  for (const [k, v] of Object.entries(data.celiapp?.cotisations ?? {})) {
+    if (Number(k) <= anneeCourante) s += v || 0;
+  }
+  return s;
+};
+
+export const celiappCotiseCetteAnnee = (data: FinanceData, today = new Date()): number =>
+  data.celiapp?.cotisations?.[today.getFullYear()] ?? 0;
+
+export const celiappDisponible = (data: FinanceData, today = new Date()): number =>
+  (data.celiapp?.plafondVie ?? 40000) - celiappCotisationsCumulees(data, today);
+
+export const celiappValeurTotale = (data: FinanceData): number => valeurCompte(data, 'celiapp');
+
 // ---------- Avoir total ----------
 
 export type PartAvoir = {
@@ -257,7 +276,7 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
     });
   }
   data.comptes.forEach((c) => {
-    if (c.id === 'celi' || c.id === 'celi_enfant') return; // géré à part
+    if (c.id === 'celi' || c.id === 'celi_enfant' || c.id === 'celiapp') return; // gérés à part
     if (c.plafondAnnuel > 0) {
       const restant = c.plafondAnnuel - c.annee;
       if (restant < 1000 && restant >= 0) {
@@ -278,6 +297,25 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
       }
     }
   });
+  {
+    const dispoApp = celiappDisponible(data, today);
+    const plafondApp = data.celiapp?.plafondVie ?? 40000;
+    if (dispoApp < 0) {
+      out.push({
+        id: 'celiapp-depasse',
+        titre: 'CELIAPP : plafond à vie dépassé',
+        detail: `Tu as cotisé ${money(-dispoApp)} de trop sur le plafond à vie de ${money(plafondApp)}. Pénalité de 1 % par mois sur le trop-plein.`,
+        cible: 'plafonds',
+      });
+    } else if (dispoApp < 1000) {
+      out.push({
+        id: 'celiapp-presque',
+        titre: 'CELIAPP : bientôt plein',
+        detail: `Il te reste ${money(dispoApp)} de droits sur le plafond à vie.`,
+        cible: 'plafonds',
+      });
+    }
+  }
   if (data.celi.naissance) {
     const dispo = celiDisponible(data, today);
     if (dispo < 0) {

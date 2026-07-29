@@ -4,6 +4,13 @@ import { PageHeader } from '../App';
 import { Card, NumInput } from '../ui';
 import type { CompteInvest } from '../types';
 
+const LABEL_HOLDING: Record<string, string> = {
+  celiapp: 'CELIAPP',
+  celi: 'CELI',
+  celi_enfant: 'CELI enfant',
+  crypto: 'Wealthsimple',
+};
+
 export const PagePlacements = () => {
   const { data, setData } = useFinance();
 
@@ -39,31 +46,48 @@ export const PagePlacements = () => {
 
       <div className="grid grid-auto-300 gap-20" style={{ marginBottom: 24 }}>
         {data.comptes.map((c) => {
-          const valeur = valeurCompte(data, c.id);
-          const aHoldings = data.holdings.some(
-            (h) =>
-              (c.id === 'celiapp' && h.compte === 'CELIAPP') ||
-              (c.id === 'celi' && h.compte === 'CELI') ||
-              (c.id === 'celi_enfant' && h.compte === 'CELI enfant') ||
-              (c.id === 'crypto' && h.compte === 'Wealthsimple'),
-          );
+          const label = LABEL_HOLDING[c.id];
+          const holdingsDuCompte = data.holdings.filter((h) => h.compte === label);
+          const valeurCalculee = holdingsDuCompte.reduce((s, h) => s + h.actions * h.prix, 0);
+          const aHoldings = holdingsDuCompte.length > 0;
+          const valeurAffichee = aHoldings ? valeurCalculee : c.valeur;
+          const ecart = aHoldings ? valeurCalculee - c.valeur : 0;
+          const ecartRelatif = c.valeur > 0 ? Math.abs(ecart) / c.valeur : 0;
+          const divergent = aHoldings && c.valeur > 0 && (Math.abs(ecart) > 100 || ecartRelatif > 0.05);
           return (
             <Card key={c.id} plus="br">
               <div className="cd" style={{ fontWeight: 700, fontSize: 30, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                 {c.nom}
               </div>
               <div className="muted" style={{ fontSize: 16, marginTop: 2 }}>{c.simple}</div>
-              <div className="mono-cond" style={{ fontSize: 38, marginTop: 16 }}>{money(valeur)}</div>
-              {aHoldings ? (
+              <div className="mono-cond" style={{ fontSize: 38, marginTop: 16 }}>{money(valeurAffichee)}</div>
+              {aHoldings && (
                 <div className="subtle mt-6" style={{ fontSize: 14 }}>
                   Calculé depuis tes actifs (quantité × prix) dans « Portefeuille ».
                 </div>
-              ) : (
-                <label className="field mt-10">
-                  <span className="field__label">Valeur actuelle ($)</span>
-                  <NumInput className="field__input" style={{ fontSize: 22 }} value={c.valeur}
-                    onChange={(n) => setCompte(c.id, { valeur: n })} />
-                </label>
+              )}
+              <label className="field mt-10">
+                <span className="field__label">
+                  Valeur actuelle saisie ($){aHoldings ? ' — pour vérification' : ''}
+                </span>
+                <NumInput className="field__input" style={{ fontSize: 22 }} value={c.valeur}
+                  onChange={(n) => setCompte(c.id, { valeur: n })} />
+              </label>
+              {aHoldings && (
+                <div
+                  className="mt-8"
+                  style={{
+                    fontSize: 14,
+                    color: divergent ? '#a4402f' : '#5980a6',
+                    fontWeight: divergent ? 700 : 500,
+                  }}
+                >
+                  {c.valeur === 0
+                    ? `Calculé depuis Portefeuille : ${money(valeurCalculee)}. Saisis ta valeur réelle pour vérifier.`
+                    : divergent
+                      ? `Écart de ${money(ecart)} entre saisi (${money(c.valeur)}) et calculé (${money(valeurCalculee)}). Vérifie tes prix ou quantités.`
+                      : `Saisi ${money(c.valeur)} · calculé ${money(valeurCalculee)} — cohérent.`}
+                </div>
               )}
               <label className="field mt-14">
                 <span className="field__label">À chaque paie, j'ajoute ($)</span>

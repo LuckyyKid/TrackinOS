@@ -8,11 +8,16 @@ import {
   celiPlafondAnnuel,
   celiPlafondCumule,
   celiValeurTotale,
+  celiappCotisationsCumulees,
+  celiappCotiseCetteAnnee,
+  celiappDisponible,
+  celiappValeurTotale,
   money,
+  valeurCompte,
 } from '../calc';
 import { PageHeader } from '../App';
 import { Bar, Card, NumInput } from '../ui';
-import type { CeliConfig } from '../types';
+import type { CeliConfig, CeliappConfig } from '../types';
 import { CELI_PLAFONDS_OFFICIELS } from '../types';
 
 export const PagePlafonds = () => {
@@ -20,7 +25,11 @@ export const PagePlafonds = () => {
   const today = new Date();
   const anneeCourante = today.getFullYear();
   const comptesFixes = data.comptes.filter(
-    (c) => c.plafondAnnuel > 0 && c.id !== 'celi' && c.id !== 'celi_enfant',
+    (c) =>
+      c.plafondAnnuel > 0 &&
+      c.id !== 'celi' &&
+      c.id !== 'celi_enfant' &&
+      c.id !== 'celiapp',
   );
 
   const setCeli = (patch: Partial<CeliConfig>) =>
@@ -32,6 +41,18 @@ export const PagePlafonds = () => {
       celi: {
         ...x.celi,
         cotisations: { ...x.celi.cotisations, [annee]: Math.max(0, montant) },
+      },
+    }));
+
+  const setCeliapp = (patch: Partial<CeliappConfig>) =>
+    setData((x) => ({ ...x, celiapp: { ...x.celiapp, ...patch } }));
+
+  const setCotisationCeliapp = (annee: number, montant: number) =>
+    setData((x) => ({
+      ...x,
+      celiapp: {
+        ...x.celiapp,
+        cotisations: { ...x.celiapp.cotisations, [annee]: Math.max(0, montant) },
       },
     }));
 
@@ -58,6 +79,23 @@ export const PagePlafonds = () => {
   const enTrop = dispo < 0;
   const proche = dispo >= 0 && dispo < 1000;
   const couleurCeli = enTrop ? '#a4402f' : proche ? '#a4402f' : '#416180';
+
+  const plafondAppVie = data.celiapp?.plafondVie ?? 40000;
+  const debutApp = data.celiapp?.anneeDebutCotisation || anneeCourante;
+  const anneesCotisationApp = useMemo(() => {
+    const arr: number[] = [];
+    for (let y = debutApp; y <= anneeCourante; y++) arr.push(y);
+    return arr;
+  }, [debutApp, anneeCourante]);
+  const cotiseAppTotal = celiappCotisationsCumulees(data, today);
+  const cotiseAppAnnee = celiappCotiseCetteAnnee(data, today);
+  const dispoApp = celiappDisponible(data, today);
+  const valeurCeliapp = celiappValeurTotale(data);
+  const valeurCeliappSaisie = valeurCompte(data, 'celiapp');
+  const barApp = plafondAppVie > 0 ? Math.min(1, cotiseAppTotal / plafondAppVie) : 0;
+  const enTropApp = dispoApp < 0;
+  const procheApp = dispoApp >= 0 && dispoApp < 1000;
+  const couleurApp = enTropApp || procheApp ? '#a4402f' : '#416180';
 
   return (
     <>
@@ -193,6 +231,98 @@ export const PagePlafonds = () => {
             </details>
           </>
         )}
+      </Card>
+
+      <Card
+        plus="tl"
+        style={{ marginBottom: 24, borderColor: enTropApp ? '#a4402f' : '#cfd3d7' }}
+      >
+        <div className="row between center gap-12" style={{ flexWrap: 'wrap' }}>
+          <div>
+            <div className="cd" style={{ fontWeight: 700, fontSize: 32, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              CELIAPP
+            </div>
+            <div className="muted" style={{ fontSize: 16 }}>
+              Compte pour ma première maison — un seul plafond à vie de {money(plafondAppVie)}.
+            </div>
+          </div>
+          <div className="cd" style={{ fontWeight: 700, fontSize: 30, color: couleurApp }}>
+            {enTropApp ? 'Plafond dépassé' : procheApp ? 'Presque plein' : 'Il reste de la place'}
+          </div>
+        </div>
+
+        <div className="grid grid-auto-260 gap-20 mt-24">
+          <label className="field">
+            <span className="field__label">Année où j'ai commencé à cotiser</span>
+            <NumInput
+              className="field__input"
+              style={{ fontSize: 22 }}
+              integer
+              emptyIsZero
+              value={data.celiapp?.anneeDebutCotisation || 0}
+              placeholder={String(anneeCourante)}
+              onChange={(n) => setCeliapp({ anneeDebutCotisation: n })}
+            />
+          </label>
+          <label className="field">
+            <span className="field__label">Plafond à vie ($)</span>
+            <NumInput
+              className="field__input"
+              style={{ fontSize: 22 }}
+              value={plafondAppVie}
+              onChange={(n) => setCeliapp({ plafondVie: n })}
+            />
+          </label>
+          <div>
+            <div className="muted" style={{ fontSize: 15 }}>Cotisé cette année</div>
+            <div className="mono-cond" style={{ fontSize: 30 }}>{money(cotiseAppAnnee)}</div>
+            <div className="subtle" style={{ fontSize: 14 }}>
+              Ne compte que pour le plafond à vie.
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-24">
+          <div className="row between" style={{ fontSize: 17 }}>
+            <span>Depuis le début</span>
+            <span>{money(cotiseAppTotal)} sur {money(plafondAppVie)}</span>
+          </div>
+          <div className="mt-8"><Bar value={barApp} color={couleurApp} height={26} /></div>
+          <div className="mt-8" style={{ fontSize: 17, color: '#424244' }}>
+            {enTropApp
+              ? `Tu dépasses de ${money(-dispoApp)}. Pénalité de 1 % par mois sur ce trop-plein.`
+              : `Il te reste ${money(dispoApp)} à cotiser à vie dans le CELIAPP.`}
+          </div>
+          <div className="mt-8" style={{ fontSize: 17, color: '#424244' }}>
+            Valeur actuelle : <strong>{money(valeurCeliapp)}</strong>. La valeur inclut les gains — elle peut dépasser tes cotisations sans pénalité.
+          </div>
+        </div>
+
+        <div className="mt-24">
+          <div className="section-label">Ce que j'ai cotisé chaque année</div>
+          {anneesCotisationApp.length === 0 ? (
+            <div className="subtle mt-8" style={{ fontSize: 14 }}>
+              Renseigne d'abord l'année où tu as commencé à cotiser.
+            </div>
+          ) : (
+            <div className="grid grid-auto-190 gap-14 mt-14">
+              {anneesCotisationApp.map((y) => (
+                <label key={y} className="field">
+                  <span className="field__label">{y}</span>
+                  <NumInput
+                    className="field__input"
+                    style={{ fontSize: 22 }}
+                    emptyIsZero
+                    min={0}
+                    value={data.celiapp?.cotisations?.[y] ?? 0}
+                    placeholder="0"
+                    onChange={(n) => setCotisationCeliapp(y, n)}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </Card>
 
       <div className="stack gap-20" style={{ marginBottom: 24 }}>
