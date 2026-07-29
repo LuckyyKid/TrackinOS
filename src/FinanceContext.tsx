@@ -40,6 +40,8 @@ const merge = (loaded: Partial<FinanceData>): FinanceData => {
   if (!cibles) {
     const seen = new Map<string, number>();
     rawHoldings.forEach((h) => {
+      // CELI enfant est un pool séparé (XEQT dédié aux enfants) — hors stratégie perso
+      if (h.compte === 'CELI enfant') return;
       if (h.ticker && typeof h.cible === 'number' && !seen.has(h.ticker)) {
         seen.set(h.ticker, h.cible);
       }

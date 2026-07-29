@@ -19,7 +19,12 @@ export const PagePortefeuille = () => {
   const holdingsAdulte = data.holdings.filter((h) => !estEnfant(h));
   const holdingsEnfant = data.holdings.filter(estEnfant);
 
-  const analyse = analysePortefeuille({ ...data, holdings: holdingsAdulte });
+  const comptesAdulte = data.comptes.filter((c) => c.id !== 'celi_enfant');
+  const analyse = analysePortefeuille({
+    ...data,
+    holdings: holdingsAdulte,
+    comptes: comptesAdulte,
+  });
 
   const conic =
     analyse.positions.length > 0 && analyse.total > 0
@@ -114,7 +119,7 @@ export const PagePortefeuille = () => {
           <div>
             <div className="section-label">Ma stratégie de répartition</div>
             <p className="pretty mt-6" style={{ fontSize: 16, color: '#424244', maxWidth: 720 }}>
-              Décide quel % de ton portefeuille tu veux dans chaque ticker. La cible s'applique à la valeur totale du ticker, tous comptes confondus (CELI + CELIAPP + …). Le total doit faire 100 %.
+              Décide quel % de ton portefeuille perso (CELIAPP + CELI + Wealthsimple) tu veux dans chaque ticker. Le CELI enfant (XEQT) est un pool séparé et n'entre pas dans cette répartition. Le total doit faire 100 %.
             </p>
           </div>
           <button className="btn btn--primary" onClick={addCible}>+ Ajouter un ticker cible</button>
