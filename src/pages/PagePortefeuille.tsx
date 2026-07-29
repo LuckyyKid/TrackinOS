@@ -1,14 +1,11 @@
 import { useFinance } from '../FinanceContext';
-import { analysePortefeuille, money, pct } from '../calc';
+import { LABEL_HOLDING, analysePortefeuille, money, pct } from '../calc';
 import { PageHeader } from '../App';
 import { Bar, Card, NumInput } from '../ui';
-import type { Cible, Holding } from '../types';
+import type { Cible, CompteInvest, Holding } from '../types';
 import { COMPTES_HOLDING } from '../types';
 
 const COULEURS = ['#1d2d3d', '#416180', '#5980a6', '#94bce3', '#d6ebff'];
-const COMPTE_ENFANT = 'CELI enfant';
-
-const estEnfant = (h: Holding) => h.compte === COMPTE_ENFANT;
 
 const uid = (): string =>
   'h_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
@@ -16,15 +13,14 @@ const uid = (): string =>
 export const PagePortefeuille = () => {
   const { data, setData } = useFinance();
 
-  const holdingsAdulte = data.holdings.filter((h) => !estEnfant(h));
-  const holdingsEnfant = data.holdings.filter(estEnfant);
+  const comptesStrategie = data.comptes.filter((c) => c.dansStrategie);
+  const comptesHorsStrat = data.comptes.filter((c) => !c.dansStrategie);
+  const labelsPerso = new Set(
+    comptesStrategie.map((c) => LABEL_HOLDING[c.id]).filter(Boolean),
+  );
+  const holdingsHorsStrat = data.holdings.filter((h) => !labelsPerso.has(h.compte));
 
-  const comptesAdulte = data.comptes.filter((c) => c.id !== 'celi_enfant');
-  const analyse = analysePortefeuille({
-    ...data,
-    holdings: holdingsAdulte,
-    comptes: comptesAdulte,
-  });
+  const analyse = analysePortefeuille(data);
 
   const conic =
     analyse.positions.length > 0 && analyse.total > 0
@@ -38,8 +34,6 @@ export const PagePortefeuille = () => {
           .join(', ')
       : '#e7e7ea 0 360deg';
 
-  const totalEnfant = holdingsEnfant.reduce((s, h) => s + h.actions * h.prix, 0);
-
   const setReequilibrage = (patch: Partial<typeof data.reequilibrage>) =>
     setData((x) => ({ ...x, reequilibrage: { ...x.reequilibrage, ...patch } }));
 
@@ -51,6 +45,12 @@ export const PagePortefeuille = () => {
 
   const removeHolding = (id: string) =>
     setData((x) => ({ ...x, holdings: x.holdings.filter((h) => h.id !== id) }));
+
+  const setCompte = (id: CompteInvest['id'], patch: Partial<CompteInvest>) =>
+    setData((x) => ({
+      ...x,
+      comptes: x.comptes.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    }));
 
   const dupliquerLigne = (source: Holding) =>
     setData((x) => {
@@ -73,7 +73,7 @@ export const PagePortefeuille = () => {
       };
     });
 
-  const ajouterActif = (enfant: boolean) =>
+  const ajouterActif = (compteLabel: string) =>
     setData((x) => ({
       ...x,
       holdings: [
@@ -81,7 +81,7 @@ export const PagePortefeuille = () => {
         {
           id: uid(),
           ticker: '',
-          compte: enfant ? COMPTE_ENFANT : 'CELI',
+          compte: compteLabel,
           actions: 0,
           prix: 0,
         },
@@ -106,6 +106,8 @@ export const PagePortefeuille = () => {
   const cibleMoins = !cibleValide && !cibleTrop && data.cibles.length > 0;
   const couleurTotal = cibleValide ? '#2b6a3d' : '#a4402f';
 
+  const labelsStrategie = comptesStrategie.map((c) => LABEL_HOLDING[c.id]).filter(Boolean);
+
   return (
     <>
       <PageHeader
@@ -119,7 +121,7 @@ export const PagePortefeuille = () => {
           <div>
             <div className="section-label">Ma stratégie de répartition</div>
             <p className="pretty mt-6" style={{ fontSize: 16, color: '#424244', maxWidth: 720 }}>
-              Décide quel % de ton portefeuille perso (CELIAPP + CELI + Wealthsimple) tu veux dans chaque ticker. Le CELI enfant (XEQT) est un pool séparé et n'entre pas dans cette répartition. Le total doit faire 100 %.
+              Décide quel % de ton portefeuille personnel tu veux dans chaque ticker. Seuls les comptes marqués « en stratégie » entrent dans ce calcul — les autres (ex. CELI enfant, crypto) sont un pool séparé mais toujours comptés dans ton avoir total.
             </p>
           </div>
           <button className="btn btn--primary" onClick={addCible}>+ Ajouter un ticker cible</button>
@@ -176,7 +178,7 @@ export const PagePortefeuille = () => {
 
       <div className="grid grid-auto-290 gap-20">
         <Card plus="tl" style={{ padding: 26 }}>
-          <div className="section-label" style={{ width: '100%' }}>Répartition (adulte)</div>
+          <div className="section-label" style={{ width: '100%' }}>Répartition (perso)</div>
           <div className="stack center gap-14 mt-14">
             <div
               style={{
@@ -194,7 +196,7 @@ export const PagePortefeuille = () => {
                 width: '60%', height: '60%', borderRadius: '50%', background: '#f2f2f3',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               }}>
-                <div className="muted" style={{ fontSize: 14 }}>Total adulte</div>
+                <div className="muted" style={{ fontSize: 14 }}>Total perso</div>
                 <div className="mono-cond" style={{ fontSize: 26 }}>{money(analyse.total)}</div>
               </div>
             </div>
@@ -207,14 +209,24 @@ export const PagePortefeuille = () => {
                   <span style={{ fontWeight: 700, minWidth: 54, textAlign: 'right' }}>{pct(p.poids)}</span>
                 </div>
               ))}
+              {analyse.cash > 0 && (
+                <div className="row center gap-10" style={{ fontSize: 16, borderTop: '1px dashed #cfd3d7', paddingTop: 8 }}>
+                  <span style={{ width: 14, height: 14, background: '#e7e7ea' }} />
+                  <span style={{ flex: 1 }} className="muted">Cash à investir</span>
+                  <span className="mono-cond" style={{ fontSize: 17 }}>{money(analyse.cash)}</span>
+                </div>
+              )}
             </div>
           </div>
         </Card>
 
         <div style={{ border: '1px solid #cfd3d7', padding: 26, minWidth: 280 }}>
           <div className="row between center gap-10" style={{ flexWrap: 'wrap' }}>
-            <div className="section-label">Mes actifs (adulte)</div>
-            <button className="btn btn--primary" onClick={() => ajouterActif(false)}>+ Ajouter un actif</button>
+            <div className="section-label">Mes actifs (perso)</div>
+            <button
+              className="btn btn--primary"
+              onClick={() => ajouterActif(labelsStrategie[0] ?? 'CELI')}
+            >+ Ajouter un actif</button>
           </div>
           <div className="stack mt-14">
             {analyse.positions.map((p) => {
@@ -305,67 +317,137 @@ export const PagePortefeuille = () => {
             </label>
             <div>
               <div className="muted" style={{ fontSize: 16 }}>Argent à répartir à la prochaine paie</div>
-              <div className="mono-cond" style={{ fontSize: 30 }}>{money(analyse.prochaineContribution)}</div>
+              <div className="mono-cond" style={{ fontSize: 30 }}>{money(analyse.aDistribuer)}</div>
+              {analyse.cash > 0 && (
+                <div className="subtle mt-6" style={{ fontSize: 13 }}>
+                  {money(analyse.cash)} déjà en cash + {money(analyse.prochaineContribution)} à la prochaine paie
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       <Card className="card--pad-md" plus="br" style={{ marginTop: 24 }}>
-        <div className="row between center gap-12" style={{ flexWrap: 'wrap' }}>
-          <div>
-            <div className="section-label">Portefeuille enfant</div>
-            <div className="cd" style={{ fontWeight: 700, fontSize: 30, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              Compte CELI dédié · XEQT
-            </div>
-            <div className="muted" style={{ fontSize: 16, maxWidth: 620 }}>
-              Ce compte partage la même limite CELI que ton compte principal — chaque dollar cotisé ici réduit ta place disponible dans l'autre.
-            </div>
-          </div>
-          <div className="row center gap-12" style={{ flexWrap: 'wrap' }}>
-            <div>
-              <div className="muted" style={{ fontSize: 14 }}>Valeur</div>
-              <div className="mono-cond" style={{ fontSize: 34 }}>{money(totalEnfant)}</div>
-            </div>
-            <button className="btn btn--primary" onClick={() => ajouterActif(true)}>+ Ajouter un actif</button>
-          </div>
-        </div>
-
-        <div className="stack mt-14">
-          {holdingsEnfant.map((h) => {
-            const valeur = h.actions * h.prix;
+        <div className="section-label">Cash disponible dans mes comptes (perso)</div>
+        <p className="pretty mt-6" style={{ fontSize: 15, color: '#424244', maxWidth: 720 }}>
+          Ce que tu as en cash non investi dans chaque compte. Ça permet à la réconciliation avec « Mes placements » de tomber juste (holdings + cash = valeur saisie) et de savoir combien il te reste à placer avant la prochaine paie.
+        </p>
+        <div className="grid grid-auto-220 gap-14 mt-14">
+          {comptesStrategie.map((c) => {
+            const label = LABEL_HOLDING[c.id];
+            const holdingsDuCompte = data.holdings.filter((h) => h.compte === label);
+            const valeurCalculee = holdingsDuCompte.reduce((s, h) => s + h.actions * h.prix, 0);
             return (
-              <div key={h.id} className="stack gap-10" style={{ borderTop: '1px solid #e7e7ea', padding: '16px 0' }}>
-                <div className="row between center gap-14" style={{ flexWrap: 'wrap' }}>
-                  <input
-                    className="field__input"
-                    style={{ maxWidth: 160, fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 24, letterSpacing: '0.04em', textTransform: 'uppercase' }}
-                    placeholder="TICKER"
-                    value={h.ticker}
-                    onChange={(e) => setHolding(h.id, { ticker: e.target.value.toUpperCase() })}
-                  />
-                  <div className="mono-cond" style={{ fontSize: 22 }}>{money(valeur)}</div>
-                </div>
-                <div className="grid grid-auto-160 gap-10">
-                  <label className="field">
-                    <span className="field__label">Quantité</span>
-                    <NumInput className="field__input" style={{ fontSize: 20 }} value={h.actions}
-                      onChange={(n) => setHolding(h.id, { actions: n })} />
-                  </label>
-                  <label className="field">
-                    <span className="field__label">Prix actuel ($)</span>
-                    <NumInput className="field__input" style={{ fontSize: 20 }} value={h.prix}
-                      onChange={(n) => setHolding(h.id, { prix: n })} />
-                  </label>
-                </div>
-                <div className="row gap-8">
-                  <button className="btn" onClick={() => removeHolding(h.id)}>Supprimer</button>
+              <div key={c.id} style={{ borderTop: '1px solid #e7e7ea', paddingTop: 12 }}>
+                <div className="cd" style={{ fontWeight: 700, fontSize: 18, letterSpacing: '0.03em' }}>{c.nom}</div>
+                <div className="subtle" style={{ fontSize: 13 }}>Actifs : {money(valeurCalculee)}</div>
+                <label className="field mt-8">
+                  <span className="field__label">Cash ($)</span>
+                  <NumInput className="field__input" style={{ fontSize: 20 }} value={c.cash}
+                    onChange={(n) => setCompte(c.id, { cash: n })} />
+                </label>
+                <div className="mono-cond mt-6" style={{ fontSize: 16 }}>
+                  Total compte : {money(valeurCalculee + c.cash)}
                 </div>
               </div>
             );
           })}
         </div>
       </Card>
+
+      {comptesHorsStrat.length > 0 && (
+        <Card className="card--pad-md" plus="br" style={{ marginTop: 24 }}>
+          <div className="section-label">Comptes hors stratégie</div>
+          <p className="pretty mt-6" style={{ fontSize: 15, color: '#424244', maxWidth: 720 }}>
+            Ces comptes ne sont pas répartis selon tes cibles perso — soit c'est un pool dédié (ex. CELI enfant), soit une catégorie à part (crypto). Ils restent comptés dans ton avoir total.
+          </p>
+          <div className="stack mt-14 gap-16">
+            {comptesHorsStrat.map((c) => {
+              const label = LABEL_HOLDING[c.id];
+              const lignes = data.holdings.filter((h) => h.compte === label);
+              const valeur = lignes.reduce((s, h) => s + h.actions * h.prix, 0) + c.cash;
+              return (
+                <div key={c.id} style={{ borderTop: '1px solid #e7e7ea', paddingTop: 14 }}>
+                  <div className="row between center gap-14" style={{ flexWrap: 'wrap' }}>
+                    <div>
+                      <div className="cd" style={{ fontWeight: 700, fontSize: 24, letterSpacing: '0.03em', textTransform: 'uppercase' }}>{c.nom}</div>
+                      <div className="muted" style={{ fontSize: 15 }}>{c.simple}</div>
+                    </div>
+                    <div className="row center gap-12" style={{ flexWrap: 'wrap' }}>
+                      <div>
+                        <div className="muted" style={{ fontSize: 13 }}>Valeur</div>
+                        <div className="mono-cond" style={{ fontSize: 26 }}>{money(valeur)}</div>
+                      </div>
+                      <button className="btn" onClick={() => setCompte(c.id, { dansStrategie: true })}>
+                        Inclure dans la stratégie
+                      </button>
+                      <button className="btn btn--primary" onClick={() => ajouterActif(label)}>+ Ajouter un actif</button>
+                    </div>
+                  </div>
+
+                  <div className="stack mt-10 gap-8">
+                    {lignes.map((h) => (
+                      <div key={h.id} className="grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'end' }}>
+                        <label className="field">
+                          <span className="field__label">Ticker</span>
+                          <input
+                            className="field__input"
+                            style={{ fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 20, letterSpacing: '0.04em', textTransform: 'uppercase' }}
+                            placeholder="TICKER"
+                            value={h.ticker}
+                            onChange={(e) => setHolding(h.id, { ticker: e.target.value.toUpperCase() })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span className="field__label">Quantité</span>
+                          <NumInput className="field__input" style={{ fontSize: 20 }} value={h.actions}
+                            onChange={(n) => setHolding(h.id, { actions: n })} />
+                        </label>
+                        <label className="field">
+                          <span className="field__label">Prix ($)</span>
+                          <NumInput className="field__input" style={{ fontSize: 20 }} value={h.prix}
+                            onChange={(n) => setHolding(h.id, { prix: n })} />
+                        </label>
+                        <div className="row gap-6" style={{ paddingBottom: 6 }}>
+                          <div className="mono-cond" style={{ fontSize: 18, flex: 1, textAlign: 'right' }}>
+                            {money(h.actions * h.prix)}
+                          </div>
+                          <button className="btn" onClick={() => removeHolding(h.id)}>×</button>
+                        </div>
+                      </div>
+                    ))}
+                    <label className="field" style={{ maxWidth: 220 }}>
+                      <span className="field__label">Cash ($)</span>
+                      <NumInput className="field__input" style={{ fontSize: 20 }} value={c.cash}
+                        onChange={(n) => setCompte(c.id, { cash: n })} />
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {holdingsHorsStrat.some((h) => !comptesHorsStrat.some((c) => LABEL_HOLDING[c.id] === h.compte)) && (
+        <Card className="card--pad-md" style={{ marginTop: 24 }}>
+          <div className="section-label">Actifs non rattachés à un compte connu</div>
+          <p className="pretty mt-6" style={{ fontSize: 14, color: '#a4402f' }}>
+            Ces actifs pointent vers un libellé de compte inconnu. Corrige leur compte ou supprime-les.
+          </p>
+          <div className="stack mt-10 gap-8">
+            {holdingsHorsStrat
+              .filter((h) => !comptesHorsStrat.some((c) => LABEL_HOLDING[c.id] === h.compte))
+              .map((h) => (
+                <div key={h.id} className="row between center gap-10" style={{ flexWrap: 'wrap' }}>
+                  <span>{h.ticker || '—'} · {h.compte}</span>
+                  <button className="btn" onClick={() => removeHolding(h.id)}>Supprimer</button>
+                </div>
+              ))}
+          </div>
+        </Card>
+      )}
     </>
   );
 };

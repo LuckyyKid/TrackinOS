@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { DEFAULT_DATA, type FinanceData } from './types';
+import { DEFAULT_DATA, type FinanceData, type CompteInvest } from './types';
 
 type Ctx = {
   data: FinanceData;
@@ -50,6 +50,20 @@ const merge = (loaded: Partial<FinanceData>): FinanceData => {
       ? Array.from(seen, ([ticker, part]) => ({ ticker, part }))
       : DEFAULT_DATA.cibles;
   }
+  const rawComptes = (loaded.comptes ?? DEFAULT_DATA.comptes) as Array<
+    Partial<CompteInvest> & Pick<CompteInvest, 'id'>
+  >;
+  const comptes: CompteInvest[] = rawComptes.map((c) => {
+    const defaut = DEFAULT_DATA.comptes.find((d) => d.id === c.id);
+    const base = defaut ?? DEFAULT_DATA.comptes[0];
+    return {
+      ...base,
+      ...c,
+      cash: typeof c.cash === 'number' ? c.cash : 0,
+      dansStrategie:
+        typeof c.dansStrategie === 'boolean' ? c.dansStrategie : defaut?.dansStrategie ?? true,
+    };
+  });
   return {
     ...DEFAULT_DATA,
     ...loaded,
@@ -58,6 +72,7 @@ const merge = (loaded: Partial<FinanceData>): FinanceData => {
     reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
     coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },
     carte: { ...DEFAULT_DATA.carte, ...(loaded.carte ?? {}) },
+    comptes,
     holdings,
     cibles,
   };

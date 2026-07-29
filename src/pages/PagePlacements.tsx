@@ -1,15 +1,8 @@
 import { useFinance } from '../FinanceContext';
-import { money, valeurCompte } from '../calc';
+import { LABEL_HOLDING, money, valeurCompte } from '../calc';
 import { PageHeader } from '../App';
 import { Card, NumInput } from '../ui';
 import type { CompteInvest } from '../types';
-
-const LABEL_HOLDING: Record<string, string> = {
-  celiapp: 'CELIAPP',
-  celi: 'CELI',
-  celi_enfant: 'CELI enfant',
-  crypto: 'Wealthsimple',
-};
 
 export const PagePlacements = () => {
   const { data, setData } = useFinance();
@@ -48,22 +41,33 @@ export const PagePlacements = () => {
         {data.comptes.map((c) => {
           const label = LABEL_HOLDING[c.id];
           const holdingsDuCompte = data.holdings.filter((h) => h.compte === label);
-          const valeurCalculee = holdingsDuCompte.reduce((s, h) => s + h.actions * h.prix, 0);
+          const valeurHoldings = holdingsDuCompte.reduce((s, h) => s + h.actions * h.prix, 0);
           const aHoldings = holdingsDuCompte.length > 0;
+          const valeurCalculee = valeurHoldings + c.cash;
           const valeurAffichee = aHoldings ? valeurCalculee : c.valeur;
           const ecart = aHoldings ? valeurCalculee - c.valeur : 0;
           const ecartRelatif = c.valeur > 0 ? Math.abs(ecart) / c.valeur : 0;
           const divergent = aHoldings && c.valeur > 0 && (Math.abs(ecart) > 100 || ecartRelatif > 0.05);
           return (
             <Card key={c.id} plus="br">
-              <div className="cd" style={{ fontWeight: 700, fontSize: 30, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                {c.nom}
+              <div className="row between center gap-10" style={{ flexWrap: 'wrap' }}>
+                <div className="cd" style={{ fontWeight: 700, fontSize: 30, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  {c.nom}
+                </div>
+                <label className="row center gap-6" style={{ fontSize: 14, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={c.dansStrategie}
+                    onChange={(e) => setCompte(c.id, { dansStrategie: e.target.checked })}
+                  />
+                  <span className="muted">Dans la stratégie</span>
+                </label>
               </div>
               <div className="muted" style={{ fontSize: 16, marginTop: 2 }}>{c.simple}</div>
               <div className="mono-cond" style={{ fontSize: 38, marginTop: 16 }}>{money(valeurAffichee)}</div>
               {aHoldings && (
                 <div className="subtle mt-6" style={{ fontSize: 14 }}>
-                  Calculé depuis tes actifs (quantité × prix) dans « Portefeuille ».
+                  Actifs {money(valeurHoldings)} + cash {money(c.cash)} = {money(valeurCalculee)}
                 </div>
               )}
               <label className="field mt-10">
@@ -74,6 +78,13 @@ export const PagePlacements = () => {
                   onChange={(n) => setCompte(c.id, { valeur: n })} />
               </label>
               {aHoldings && (
+                <label className="field mt-10">
+                  <span className="field__label">Cash dans le compte ($)</span>
+                  <NumInput className="field__input" style={{ fontSize: 20 }} value={c.cash}
+                    onChange={(n) => setCompte(c.id, { cash: n })} />
+                </label>
+              )}
+              {aHoldings && (
                 <div
                   className="mt-8"
                   style={{
@@ -83,10 +94,10 @@ export const PagePlacements = () => {
                   }}
                 >
                   {c.valeur === 0
-                    ? `Calculé depuis Portefeuille : ${money(valeurCalculee)}. Saisis ta valeur réelle pour vérifier.`
+                    ? `Actifs + cash : ${money(valeurCalculee)}. Saisis ta valeur réelle pour vérifier.`
                     : divergent
-                      ? `Écart de ${money(ecart)} entre saisi (${money(c.valeur)}) et calculé (${money(valeurCalculee)}). Vérifie tes prix ou quantités.`
-                      : `Saisi ${money(c.valeur)} · calculé ${money(valeurCalculee)} — cohérent.`}
+                      ? `Écart de ${money(ecart)} entre saisi (${money(c.valeur)}) et actifs + cash (${money(valeurCalculee)}). Ajuste le cash ou vérifie tes quantités.`
+                      : `Saisi ${money(c.valeur)} · actifs + cash ${money(valeurCalculee)} — cohérent.`}
                 </div>
               )}
               <label className="field mt-14">

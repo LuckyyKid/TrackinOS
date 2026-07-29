@@ -50,6 +50,8 @@ export type CompteInvest = {
   plafondAnnuel: number;
   plafondVie: number;
   utilise: number;
+  cash: number;
+  dansStrategie: boolean;
 };
 
 export type Holding = {
@@ -143,10 +145,10 @@ export const DEFAULT_DATA: FinanceData = {
     autopayMontant: 1740,
   },
   comptes: [
-    { id: 'celiapp', nom: 'CELIAPP', simple: 'Compte pour ma première maison', valeur: 11848, parCycle: 200, annee: 7250, plafondAnnuel: 8000, plafondVie: 40000, utilise: 15400 },
-    { id: 'celi', nom: 'CELI', simple: 'Compte à l\u2019abri d\u2019impôt', valeur: 16101, parCycle: 150, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0 },
-    { id: 'celi_enfant', nom: 'CELI enfant', simple: 'CELI dédié à mon portefeuille enfant (XEQT)', valeur: 0, parCycle: 0, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0 },
-    { id: 'crypto', nom: 'Crypto', simple: 'Placements Wealthsimple', valeur: 4301, parCycle: 50, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0 },
+    { id: 'celiapp', nom: 'CELIAPP', simple: 'Compte pour ma première maison', valeur: 11848, parCycle: 200, annee: 7250, plafondAnnuel: 8000, plafondVie: 40000, utilise: 15400, cash: 0, dansStrategie: true },
+    { id: 'celi', nom: 'CELI', simple: 'Compte à l\u2019abri d\u2019impôt', valeur: 16101, parCycle: 150, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0, cash: 0, dansStrategie: true },
+    { id: 'celi_enfant', nom: 'CELI enfant', simple: 'CELI dédié au portefeuille des enfants', valeur: 0, parCycle: 0, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0, cash: 0, dansStrategie: false },
+    { id: 'crypto', nom: 'Crypto', simple: 'Placements Wealthsimple', valeur: 4301, parCycle: 50, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0, cash: 0, dansStrategie: false },
   ],
   holdings: [
     { id: 'h_spus_celi', ticker: 'SPUS', compte: 'CELI', actions: 0, prix: 0 },

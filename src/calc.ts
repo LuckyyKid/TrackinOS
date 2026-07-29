@@ -91,13 +91,23 @@ export type PortefeuillePos = {
 
 export const analysePortefeuille = (data: FinanceData): {
   positions: PortefeuillePos[];
-  total: number;
+  total: number; // holdings perso + cash perso
+  totalHoldings: number; // valeur des holdings perso seulement
+  cash: number; // cash des comptes en stratégie
   prochaineContribution: number;
+  aDistribuer: number; // cash + prochaine contribution
 } => {
-  const prochaineContribution = data.comptes.reduce((s, c) => s + c.parCycle, 0);
+  const comptesStrategie = data.comptes.filter((c) => c.dansStrategie);
+  const labelsPerso = new Set(
+    comptesStrategie.map((c) => LABEL_HOLDING[c.id]).filter(Boolean),
+  );
+  const holdingsPerso = data.holdings.filter((h) => labelsPerso.has(h.compte));
+  const cash = comptesStrategie.reduce((s, c) => s + (c.cash || 0), 0);
+  const prochaineContribution = comptesStrategie.reduce((s, c) => s + c.parCycle, 0);
+  const aDistribuer = cash + prochaineContribution;
 
   const parTicker = new Map<string, Holding[]>();
-  data.holdings.forEach((h) => {
+  holdingsPerso.forEach((h) => {
     if (!h.ticker) return;
     const arr = parTicker.get(h.ticker) ?? [];
     arr.push(h);
@@ -122,7 +132,8 @@ export const analysePortefeuille = (data: FinanceData): {
     const lignes = parTicker.get(t) ?? [];
     valeurs.set(t, lignes.reduce((s, h) => s + h.actions * h.prix, 0));
   });
-  const total = Array.from(valeurs.values()).reduce((s, v) => s + v, 0);
+  const totalHoldings = Array.from(valeurs.values()).reduce((s, v) => s + v, 0);
+  const total = totalHoldings + cash;
   const totalCible = total + prochaineContribution;
 
   const positions: PortefeuillePos[] = tickers.map((ticker) => {
@@ -137,16 +148,16 @@ export const analysePortefeuille = (data: FinanceData): {
   });
 
   const besoinTotal = positions.reduce((s, p) => s + p.besoin, 0);
-  if (besoinTotal <= 0 || prochaineContribution <= 0) {
+  if (besoinTotal <= 0 || aDistribuer <= 0) {
     positions.forEach((p) => (p.achat = 0));
-  } else if (besoinTotal <= prochaineContribution) {
+  } else if (besoinTotal <= aDistribuer) {
     positions.forEach((p) => (p.achat = p.besoin));
   } else {
-    const facteur = prochaineContribution / besoinTotal;
+    const facteur = aDistribuer / besoinTotal;
     positions.forEach((p) => (p.achat = p.besoin * facteur));
   }
 
-  return { positions, total, prochaineContribution };
+  return { positions, total, totalHoldings, cash, prochaineContribution, aDistribuer };
 };
 
 // ---------- CELI (plafond partagé selon date de naissance + historique) ----------
@@ -191,7 +202,7 @@ export const celiCotiseCetteAnnee = (data: FinanceData, today = new Date()): num
   data.celi.cotisations?.[today.getFullYear()] ?? 0;
 
 // Mappe l'id d'un compte vers le libellé « compte » utilisé dans les holdings
-const LABEL_HOLDING: Record<string, string> = {
+export const LABEL_HOLDING: Record<string, string> = {
   celiapp: 'CELIAPP',
   celi: 'CELI',
   celi_enfant: 'CELI enfant',
@@ -200,11 +211,12 @@ const LABEL_HOLDING: Record<string, string> = {
 
 export const valeurCompte = (data: FinanceData, compteId: string): number => {
   const label = LABEL_HOLDING[compteId];
+  const compte = data.comptes.find((c) => c.id === compteId);
   const desHoldings = data.holdings.filter((h) => h.compte === label);
   if (desHoldings.length > 0) {
-    return desHoldings.reduce((s, h) => s + h.actions * h.prix, 0);
+    const invest = desHoldings.reduce((s, h) => s + h.actions * h.prix, 0);
+    return invest + (compte?.cash ?? 0);
   }
-  const compte = data.comptes.find((c) => c.id === compteId);
   return compte?.valeur ?? 0;
 };
 
