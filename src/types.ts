@@ -88,6 +88,11 @@ export type CeliappConfig = {
   plafondVie: number; // 40 000 $ par défaut
 };
 
+export type ObjectifFinancier = {
+  montant: number; // ex: 2 000 000
+  ageCible: number; // ex: 45
+};
+
 // Plafonds officiels CRA du CELI par année
 export const CELI_PLAFONDS_OFFICIELS: Record<number, number> = {
   2009: 5000, 2010: 5000, 2011: 5000, 2012: 5000,
@@ -111,6 +116,7 @@ export type FinanceData = {
   rendementAnnuel: number;
   celi: CeliConfig;
   celiapp: CeliappConfig;
+  objectif: ObjectifFinancier;
 };
 
 export const DEFAULT_DATA: FinanceData = {
@@ -173,5 +179,9 @@ export const DEFAULT_DATA: FinanceData = {
     anneeDebutCotisation: 0,
     cotisations: {},
     plafondVie: 40000,
+  },
+  objectif: {
+    montant: 1000000,
+    ageCible: 45,
   },
 };

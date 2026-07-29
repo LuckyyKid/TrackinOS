@@ -77,6 +77,157 @@ export const projection = (
   return points;
 };
 
+// ---------- Objectif financier ----------
+
+export const ageActuel = (naissance: string, today = new Date()): number | null => {
+  if (!naissance) return null;
+  const d = new Date(naissance);
+  if (Number.isNaN(d.getTime())) return null;
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age;
+};
+
+export const moisJusquAge = (
+  naissance: string,
+  ageCible: number,
+  today = new Date(),
+): number | null => {
+  if (!naissance) return null;
+  const d = new Date(naissance);
+  if (Number.isNaN(d.getTime())) return null;
+  const cible = new Date(d.getFullYear() + ageCible, d.getMonth(), d.getDate());
+  const mois =
+    (cible.getFullYear() - today.getFullYear()) * 12 +
+    (cible.getMonth() - today.getMonth());
+  return mois;
+};
+
+const valeurFuture = (pv: number, pmt: number, rMois: number, n: number): number => {
+  if (n <= 0) return pv;
+  if (rMois === 0) return pv + pmt * n;
+  const facteur = Math.pow(1 + rMois, n);
+  return pv * facteur + pmt * ((facteur - 1) / rMois);
+};
+
+export type EtatObjectif =
+  | { type: 'pas_de_naissance' }
+  | { type: 'age_deja_atteint'; ageActuel: number; ageCible: number }
+  | {
+      type: 'ok';
+      ageActuel: number;
+      ageCible: number;
+      moisRestants: number;
+      valeurActuelle: number;
+      contribMensuelle: number;
+      rMois: number;
+      rendementAnnuel: number;
+      // rythme actuel
+      valeurALAgeCible: number; // valeur projetée à l'âge cible au rythme actuel
+      moisPourAtteindre: number | null; // mois nécessaires pour atteindre l'objectif au rythme actuel
+      ageAtteinte: number | null; // âge à ce moment
+      anneeAtteinte: number | null;
+      // ajustements pour atteindre l'objectif à l'âge cible
+      manquePourAgeCible: number; // objectif - valeur à l'âge cible (>0 s'il manque)
+      contribSupplementaire: number | null; // $ / mois de plus à ajouter (null si non nécessaire)
+      contribTotaleRequise: number | null;
+      rendementAnnuelRequis: number | null; // % (null si impossible ou déjà atteint)
+    };
+
+export const etatObjectif = (data: FinanceData, today = new Date()): EtatObjectif => {
+  const naissance = data.celi.naissance;
+  const age = ageActuel(naissance, today);
+  if (age === null) return { type: 'pas_de_naissance' };
+
+  const ageCible = data.objectif.ageCible;
+  if (ageCible <= age) return { type: 'age_deja_atteint', ageActuel: age, ageCible };
+
+  const mois = moisJusquAge(naissance, ageCible, today);
+  if (mois === null || mois <= 0) {
+    return { type: 'age_deja_atteint', ageActuel: age, ageCible };
+  }
+
+  const rMois = rendementMensuel(data.rendementAnnuel);
+  const contribMensuelle = data.comptes.reduce((s, c) => s + c.parCycle * 2, 0);
+  const valeurActuelle = data.comptes.reduce((s, c) => s + c.valeur, 0);
+  const objectif = data.objectif.montant;
+
+  const valeurALAgeCible = valeurFuture(valeurActuelle, contribMensuelle, rMois, mois);
+
+  // Combien de mois pour atteindre l'objectif au rythme actuel ?
+  let moisPourAtteindre: number | null = null;
+  if (valeurActuelle >= objectif) {
+    moisPourAtteindre = 0;
+  } else {
+    let v = valeurActuelle;
+    const maxMois = 12 * 100; // 100 ans
+    for (let m = 1; m <= maxMois; m++) {
+      v = v * (1 + rMois) + contribMensuelle;
+      if (v >= objectif) {
+        moisPourAtteindre = m;
+        break;
+      }
+    }
+  }
+  const anneesAtteinte = moisPourAtteindre === null ? null : moisPourAtteindre / 12;
+  const ageAtteinte =
+    anneesAtteinte === null ? null : Math.round((age + anneesAtteinte) * 10) / 10;
+  const anneeAtteinte =
+    anneesAtteinte === null
+      ? null
+      : today.getFullYear() +
+        Math.floor((today.getMonth() + (moisPourAtteindre as number)) / 12);
+
+  const manquePourAgeCible = Math.max(0, objectif - valeurALAgeCible);
+
+  // Contribution mensuelle requise pour atteindre l'objectif à l'âge cible
+  let contribTotaleRequise: number | null = null;
+  let contribSupplementaire: number | null = null;
+  if (manquePourAgeCible > 0) {
+    const facteur = rMois === 0 ? mois : (Math.pow(1 + rMois, mois) - 1) / rMois;
+    const futureSansContrib = rMois === 0 ? valeurActuelle : valeurActuelle * Math.pow(1 + rMois, mois);
+    contribTotaleRequise = Math.max(0, (objectif - futureSansContrib) / facteur);
+    contribSupplementaire = Math.max(0, contribTotaleRequise - contribMensuelle);
+  }
+
+  // Rendement annuel requis pour atteindre l'objectif à l'âge cible avec la contribution actuelle
+  let rendementAnnuelRequis: number | null = null;
+  if (manquePourAgeCible > 0) {
+    let lo = 0;
+    let hi = 1; // 100 % par mois (extrême)
+    for (let i = 0; i < 80; i++) {
+      const mid = (lo + hi) / 2;
+      const vf = valeurFuture(valeurActuelle, contribMensuelle, mid, mois);
+      if (vf < objectif) lo = mid;
+      else hi = mid;
+    }
+    const rMoisRequis = (lo + hi) / 2;
+    if (rMoisRequis < 0.99) {
+      rendementAnnuelRequis = (Math.pow(1 + rMoisRequis, 12) - 1) * 100;
+    }
+  }
+
+  return {
+    type: 'ok',
+    ageActuel: age,
+    ageCible,
+    moisRestants: mois,
+    valeurActuelle,
+    contribMensuelle,
+    rMois,
+    rendementAnnuel: data.rendementAnnuel,
+    valeurALAgeCible,
+    moisPourAtteindre,
+    ageAtteinte,
+    anneeAtteinte,
+    manquePourAgeCible,
+    contribSupplementaire,
+    contribTotaleRequise,
+    rendementAnnuelRequis,
+  };
+};
+
 export type PortefeuillePos = {
   ticker: string;
   lignes: Holding[];
