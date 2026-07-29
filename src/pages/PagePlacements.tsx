@@ -1,7 +1,7 @@
 import { useFinance } from '../FinanceContext';
 import { money, valeurCompte } from '../calc';
 import { PageHeader } from '../App';
-import { Card } from '../ui';
+import { Card, NumInput } from '../ui';
 import type { CompteInvest } from '../types';
 
 export const PagePlacements = () => {
@@ -61,14 +61,14 @@ export const PagePlacements = () => {
               ) : (
                 <label className="field mt-10">
                   <span className="field__label">Valeur actuelle ($)</span>
-                  <input className="field__input" style={{ fontSize: 22 }} inputMode="decimal" value={c.valeur}
-                    onChange={(e) => setCompte(c.id, { valeur: Number(e.target.value) || 0 })} />
+                  <NumInput className="field__input" style={{ fontSize: 22 }} value={c.valeur}
+                    onChange={(n) => setCompte(c.id, { valeur: n })} />
                 </label>
               )}
               <label className="field mt-14">
                 <span className="field__label">À chaque paie, j'ajoute ($)</span>
-                <input className="field__input" style={{ fontSize: 24 }} inputMode="numeric" value={c.parCycle}
-                  onChange={(e) => setCompte(c.id, { parCycle: Number(e.target.value) || 0 })} />
+                <NumInput className="field__input" style={{ fontSize: 24 }} value={c.parCycle}
+                  onChange={(n) => setCompte(c.id, { parCycle: n })} />
               </label>
               <div className="blue mt-10" style={{ fontSize: 16 }}>
                 = {money(c.parCycle * 2)} par mois · {money(c.parCycle * 24)} par année
@@ -86,9 +86,9 @@ export const PagePlacements = () => {
           </p>
         </div>
         <div className="row center gap-12">
-          <input className="field__input" style={{ width: 130, fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 34 }}
-            inputMode="decimal" value={data.rendementAnnuel}
-            onChange={(e) => setData((x) => ({ ...x, rendementAnnuel: Number(e.target.value) || 0 }))} />
+          <NumInput className="field__input" style={{ width: 130, fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 34 }}
+            value={data.rendementAnnuel}
+            onChange={(n) => setData((x) => ({ ...x, rendementAnnuel: n }))} />
           <span className="cd blue" style={{ fontWeight: 700, fontSize: 30 }}>% par année</span>
         </div>
       </div>

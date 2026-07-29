@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 export const Card = ({
@@ -103,3 +104,80 @@ export const Field = ({
 export const SectionRow = ({ children }: { children: ReactNode }) => (
   <div className="row-item">{children}</div>
 );
+
+export const NumInput = ({
+  value,
+  onChange,
+  integer = false,
+  emptyIsZero = false,
+  min,
+  max,
+  className,
+  style,
+  placeholder,
+  inputMode,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  integer?: boolean;
+  emptyIsZero?: boolean;
+  min?: number;
+  max?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  placeholder?: string;
+  inputMode?: 'numeric' | 'decimal';
+}) => {
+  const format = (n: number) => {
+    const v = integer ? Math.round(n) : n;
+    return emptyIsZero && v === 0 ? '' : String(v);
+  };
+  const [text, setText] = useState<string>(() => format(value));
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (focused.current) return;
+    const parsed = Number(text.replace(',', '.'));
+    if (parsed !== value) setText(format(value));
+  }, [value]);
+
+  const clamp = (n: number) => {
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    return n;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const re = integer ? /^\d*$/ : /^\d*[.,]?\d*$/;
+    if (!re.test(raw)) return;
+    setText(raw);
+    const cleaned = raw.replace(',', '.');
+    if (cleaned === '' || cleaned === '.' || cleaned === ',') {
+      onChange(0);
+      return;
+    }
+    const n = Number(cleaned);
+    if (Number.isNaN(n)) return;
+    onChange(clamp(n));
+  };
+
+  return (
+    <input
+      className={className}
+      style={style}
+      type="text"
+      inputMode={inputMode ?? (integer ? 'numeric' : 'decimal')}
+      value={text}
+      placeholder={placeholder}
+      onChange={handleChange}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onBlur={() => {
+        focused.current = false;
+        setText(format(value));
+      }}
+    />
+  );
+};

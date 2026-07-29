@@ -8,7 +8,7 @@ import {
   utilisationCarteProjetee,
 } from '../calc';
 import { PageHeader } from '../App';
-import { Bar, Card } from '../ui';
+import { Bar, Card, NumInput } from '../ui';
 
 export const PageCarte = () => {
   const { data, setData } = useFinance();
@@ -71,23 +71,23 @@ export const PageCarte = () => {
           <div className="stack gap-14 mt-14">
             <label className="field">
               <span className="field__label">Ce que je dois aujourd'hui ($)</span>
-              <input className="field__input field__input--num" inputMode="numeric" value={data.carte.solde}
-                onChange={(e) => set({ solde: Number(e.target.value) || 0 })} />
+              <NumInput className="field__input field__input--num" value={data.carte.solde}
+                onChange={(n) => set({ solde: n })} />
             </label>
             <label className="field">
               <span className="field__label">Ma limite ($)</span>
-              <input className="field__input field__input--num" inputMode="numeric" value={data.carte.limite}
-                onChange={(e) => set({ limite: Number(e.target.value) || 0 })} />
+              <NumInput className="field__input field__input--num" value={data.carte.limite}
+                onChange={(n) => set({ limite: n })} />
             </label>
             <label className="field">
               <span className="field__label">Jour du relevé</span>
-              <input className="field__input" inputMode="numeric" value={data.carte.releve}
-                onChange={(e) => set({ releve: Number(e.target.value) || 1 })} />
+              <NumInput className="field__input" integer min={1} max={31} value={data.carte.releve}
+                onChange={(n) => set({ releve: Math.max(1, n) })} />
             </label>
             <label className="field">
               <span className="field__label">Jour de l'échéance</span>
-              <input className="field__input" inputMode="numeric" value={data.carte.echeance}
-                onChange={(e) => set({ echeance: Number(e.target.value) || 1 })} />
+              <NumInput className="field__input" integer min={1} max={31} value={data.carte.echeance}
+                onChange={(n) => set({ echeance: Math.max(1, n) })} />
             </label>
           </div>
           <div className="stack mt-20">

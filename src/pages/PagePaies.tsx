@@ -7,7 +7,7 @@ import {
   totalDepensesMensuelles,
 } from '../calc';
 import { PageHeader } from '../App';
-import { Card } from '../ui';
+import { Card, NumInput } from '../ui';
 import type { Cycle } from '../types';
 
 export const PagePaies = () => {
@@ -48,13 +48,13 @@ export const PagePaies = () => {
                 </label>
                 <label className="field">
                   <span className="field__label">Combien tu reçois ($)</span>
-                  <input className="field__input field__input--big" inputMode="numeric" value={c.montant}
-                    onChange={(e) => set(i as 0 | 1, { montant: Number(e.target.value) || 0 })} />
+                  <NumInput className="field__input field__input--big" value={c.montant}
+                    onChange={(n) => set(i as 0 | 1, { montant: n })} />
                 </label>
                 <label className="field">
                   <span className="field__label">Quel jour du mois</span>
-                  <input className="field__input" style={{ width: 120 }} inputMode="numeric" value={c.jour}
-                    onChange={(e) => set(i as 0 | 1, { jour: Math.max(1, Math.min(31, Number(e.target.value) || 1)) })} />
+                  <NumInput className="field__input" style={{ width: 120 }} integer min={1} max={31} value={c.jour}
+                    onChange={(n) => set(i as 0 | 1, { jour: Math.max(1, n) })} />
                 </label>
               </div>
               <div style={{ background: '#eef6ff', border: '1px solid #b5d9fd', padding: 16, marginTop: 20 }}>

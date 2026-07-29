@@ -1,7 +1,7 @@
 import { useFinance } from '../FinanceContext';
 import { money, projectionCoussin, soldesCycles } from '../calc';
 import { PageHeader } from '../App';
-import { Bar, Card } from '../ui';
+import { Bar, Card, NumInput } from '../ui';
 
 export const PageCoussin = () => {
   const { data, setData } = useFinance();
@@ -44,18 +44,18 @@ export const PageCoussin = () => {
           <div className="stack gap-14 mt-14">
             <label className="field">
               <span className="field__label">Argent de côté aujourd'hui ($)</span>
-              <input className="field__input field__input--num" inputMode="numeric" value={data.coussin.actuel}
-                onChange={(e) => set({ actuel: Number(e.target.value) || 0 })} />
+              <NumInput className="field__input field__input--num" value={data.coussin.actuel}
+                onChange={(n) => set({ actuel: n })} />
             </label>
             <label className="field">
               <span className="field__label">Mon objectif ($)</span>
-              <input className="field__input field__input--num" inputMode="numeric" value={data.coussin.objectif}
-                onChange={(e) => set({ objectif: Number(e.target.value) || 0 })} />
+              <NumInput className="field__input field__input--num" value={data.coussin.objectif}
+                onChange={(n) => set({ objectif: n })} />
             </label>
             <label className="field">
               <span className="field__label">Ne jamais descendre sous ($)</span>
-              <input className="field__input field__input--num" inputMode="numeric" value={data.coussin.minimum}
-                onChange={(e) => set({ minimum: Number(e.target.value) || 0 })} />
+              <NumInput className="field__input field__input--num" value={data.coussin.minimum}
+                onChange={(n) => set({ minimum: n })} />
             </label>
           </div>
         </div>

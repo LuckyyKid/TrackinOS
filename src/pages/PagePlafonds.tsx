@@ -11,7 +11,7 @@ import {
   money,
 } from '../calc';
 import { PageHeader } from '../App';
-import { Bar, Card } from '../ui';
+import { Bar, Card, NumInput } from '../ui';
 import type { CeliConfig } from '../types';
 import { CELI_PLAFONDS_OFFICIELS } from '../types';
 
@@ -98,13 +98,14 @@ export const PagePlafonds = () => {
           </label>
           <label className="field">
             <span className="field__label">Année où j'ai commencé à cotiser</span>
-            <input
+            <NumInput
               className="field__input"
               style={{ fontSize: 22 }}
-              inputMode="numeric"
-              value={data.celi.anneeDebutCotisation || ''}
+              integer
+              emptyIsZero
+              value={data.celi.anneeDebutCotisation || 0}
               placeholder={String(anneeEligible)}
-              onChange={(e) => setCeli({ anneeDebutCotisation: Number(e.target.value) || 0 })}
+              onChange={(n) => setCeli({ anneeDebutCotisation: n })}
             />
           </label>
           <div>
@@ -150,13 +151,14 @@ export const PagePlafonds = () => {
                     <span className="field__label">
                       {y} · plafond {money(celiPlafondAnnuel(data, y))}
                     </span>
-                    <input
+                    <NumInput
                       className="field__input"
                       style={{ fontSize: 22 }}
-                      inputMode="decimal"
-                      value={data.celi.cotisations?.[y] ?? ''}
+                      emptyIsZero
+                      min={0}
+                      value={data.celi.cotisations?.[y] ?? 0}
                       placeholder="0"
-                      onChange={(e) => setCotisation(y, Number(e.target.value) || 0)}
+                      onChange={(n) => setCotisation(y, n)}
                     />
                   </label>
                 ))}
@@ -172,16 +174,15 @@ export const PagePlafonds = () => {
                 {Array.from({ length: anneeCourante - 2008 }, (_, i) => 2009 + i).map((y) => (
                   <label key={y} className="field">
                     <span className="field__label">Plafond {y}</span>
-                    <input
+                    <NumInput
                       className="field__input"
                       style={{ fontSize: 18 }}
-                      inputMode="decimal"
                       value={data.celi.plafondsAnnuels?.[y] ?? CELI_PLAFONDS_OFFICIELS[y] ?? 0}
-                      onChange={(e) =>
+                      onChange={(n) =>
                         setCeli({
                           plafondsAnnuels: {
                             ...data.celi.plafondsAnnuels,
-                            [y]: Number(e.target.value) || 0,
+                            [y]: n,
                           },
                         })
                       }

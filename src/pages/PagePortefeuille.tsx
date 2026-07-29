@@ -1,7 +1,7 @@
 import { useFinance } from '../FinanceContext';
 import { analysePortefeuille, money, pct } from '../calc';
 import { PageHeader } from '../App';
-import { Bar, Card } from '../ui';
+import { Bar, Card, NumInput } from '../ui';
 import type { Holding } from '../types';
 
 const COULEURS = ['#1d2d3d', '#416180', '#5980a6', '#94bce3', '#d6ebff'];
@@ -102,32 +102,29 @@ export const PagePortefeuille = () => {
                   <div className="grid grid-auto-160 gap-10">
                     <label className="field">
                       <span className="field__label">Quantité</span>
-                      <input
+                      <NumInput
                         className="field__input"
                         style={{ fontSize: 20 }}
-                        inputMode="decimal"
                         value={p.h.actions}
-                        onChange={(e) => setHolding(p.h.ticker, p.h.compte, { actions: Number(e.target.value) || 0 })}
+                        onChange={(n) => setHolding(p.h.ticker, p.h.compte, { actions: n })}
                       />
                     </label>
                     <label className="field">
                       <span className="field__label">Prix actuel ($)</span>
-                      <input
+                      <NumInput
                         className="field__input"
                         style={{ fontSize: 20 }}
-                        inputMode="decimal"
                         value={p.h.prix}
-                        onChange={(e) => setHolding(p.h.ticker, p.h.compte, { prix: Number(e.target.value) || 0 })}
+                        onChange={(n) => setHolding(p.h.ticker, p.h.compte, { prix: n })}
                       />
                     </label>
                     <label className="field">
                       <span className="field__label">Cible (%)</span>
-                      <input
+                      <NumInput
                         className="field__input"
                         style={{ fontSize: 20 }}
-                        inputMode="decimal"
-                        value={Math.round(p.h.cible * 100)}
-                        onChange={(e) => setHolding(p.h.ticker, p.h.compte, { cible: (Number(e.target.value) || 0) / 100 })}
+                        value={p.h.cible * 100}
+                        onChange={(n) => setHolding(p.h.ticker, p.h.compte, { cible: n / 100 })}
                       />
                     </label>
                   </div>
@@ -147,13 +144,13 @@ export const PagePortefeuille = () => {
           <div className="grid mt-16" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 18, borderTop: '2px solid #1d1f20', paddingTop: 16 }}>
             <label className="field">
               <span className="field__label">Je corrige si l'écart dépasse (%)</span>
-              <input className="field__input" style={{ width: 110, fontSize: 20 }} inputMode="numeric" value={data.reequilibrage.tolerance}
-                onChange={(e) => setReequilibrage({ tolerance: Number(e.target.value) || 0 })} />
+              <NumInput className="field__input" style={{ width: 110, fontSize: 20 }} value={data.reequilibrage.tolerance}
+                onChange={(n) => setReequilibrage({ tolerance: n })} />
             </label>
             <label className="field">
               <span className="field__label">Je corrige sur (mois)</span>
-              <input className="field__input" style={{ width: 110, fontSize: 20 }} inputMode="numeric" value={data.reequilibrage.horizon}
-                onChange={(e) => setReequilibrage({ horizon: Number(e.target.value) || 0 })} />
+              <NumInput className="field__input" style={{ width: 110, fontSize: 20 }} integer value={data.reequilibrage.horizon}
+                onChange={(n) => setReequilibrage({ horizon: n })} />
             </label>
             <div>
               <div className="muted" style={{ fontSize: 16 }}>Argent à répartir à la prochaine paie</div>
@@ -192,22 +189,20 @@ export const PagePortefeuille = () => {
                 <div className="grid grid-auto-160 gap-10">
                   <label className="field">
                     <span className="field__label">Quantité</span>
-                    <input
+                    <NumInput
                       className="field__input"
                       style={{ fontSize: 20 }}
-                      inputMode="decimal"
                       value={h.actions}
-                      onChange={(e) => setHolding(h.ticker, h.compte, { actions: Number(e.target.value) || 0 })}
+                      onChange={(n) => setHolding(h.ticker, h.compte, { actions: n })}
                     />
                   </label>
                   <label className="field">
                     <span className="field__label">Prix actuel ($)</span>
-                    <input
+                    <NumInput
                       className="field__input"
                       style={{ fontSize: 20 }}
-                      inputMode="decimal"
                       value={h.prix}
-                      onChange={(e) => setHolding(h.ticker, h.compte, { prix: Number(e.target.value) || 0 })}
+                      onChange={(n) => setHolding(h.ticker, h.compte, { prix: n })}
                     />
                   </label>
                 </div>

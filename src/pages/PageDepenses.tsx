@@ -3,7 +3,7 @@ import { useFinance } from '../FinanceContext';
 import { money, soldesCycles, totalCyclePaye } from '../calc';
 import type { Categorie, CompteSrc, CycleCible, Depense } from '../types';
 import { PageHeader } from '../App';
-import { Card } from '../ui';
+import { Card, NumInput } from '../ui';
 
 const NOM_COMPTES: Record<CompteSrc, string> = {
   cheques: 'Compte chèques',
@@ -225,13 +225,12 @@ const Assistant = ({
 
       {etape === 2 && (
         <div className="row center gap-12 mt-20" style={{ flexWrap: 'wrap' }}>
-          <input
-            type="number"
-            inputMode="decimal"
+          <NumInput
             className="field__input"
             placeholder="0"
-            value={d.montant || ''}
-            onChange={(e) => set({ montant: Number(e.target.value) || 0 })}
+            emptyIsZero
+            value={d.montant}
+            onChange={(n) => set({ montant: n })}
             style={{ width: 220, borderColor: '#5980a6', fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 44, padding: 18 }}
           />
           <span className="cd blue" style={{ fontWeight: 700, fontSize: 38 }}>$ par mois</span>
@@ -262,13 +261,12 @@ const Assistant = ({
           </div>
           <div>
             <div className="blue" style={{ fontSize: 16, marginBottom: 6 }}>Quel jour du mois l'argent sort ?</div>
-            <input
-              type="number"
+            <NumInput
+              integer
               min={1}
               max={31}
-              inputMode="numeric"
               value={d.jour}
-              onChange={(e) => set({ jour: Math.max(1, Math.min(31, Number(e.target.value) || 1)) })}
+              onChange={(n) => set({ jour: Math.max(1, n) })}
               className="field__input"
               style={{ width: 130, borderColor: '#5980a6', fontSize: 24, padding: 16 }}
             />
@@ -351,11 +349,11 @@ const LigneRapide = ({
         </label>
         <label className="field">
           <span className="field__label">Combien ($)</span>
-          <input className="field__input" inputMode="decimal" placeholder="0" value={d.montant || ''} onChange={(e) => set({ montant: Number(e.target.value) || 0 })} />
+          <NumInput className="field__input" placeholder="0" emptyIsZero value={d.montant} onChange={(n) => set({ montant: n })} />
         </label>
         <label className="field">
           <span className="field__label">Jour</span>
-          <input className="field__input" inputMode="numeric" value={d.jour} onChange={(e) => set({ jour: Math.max(1, Math.min(31, Number(e.target.value) || 1)) })} />
+          <NumInput className="field__input" integer min={1} max={31} value={d.jour} onChange={(n) => set({ jour: Math.max(1, n) })} />
         </label>
         <label className="field">
           <span className="field__label">Quelle paie</span>
