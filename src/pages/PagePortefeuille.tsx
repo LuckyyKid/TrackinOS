@@ -19,6 +19,9 @@ export const PagePortefeuille = () => {
     comptesStrategie.map((c) => LABEL_HOLDING[c.id]).filter(Boolean),
   );
   const holdingsHorsStrat = data.holdings.filter((h) => !labelsPerso.has(h.compte));
+  const holdingsPersoAComp = data.holdings.filter(
+    (h) => labelsPerso.has(h.compte) && !h.ticker,
+  );
 
   const analyse = analysePortefeuille(data);
 
@@ -73,14 +76,14 @@ export const PagePortefeuille = () => {
       };
     });
 
-  const ajouterActif = (compteLabel: string) =>
+  const ajouterActif = (compteLabel: string, ticker = '') =>
     setData((x) => ({
       ...x,
       holdings: [
         ...x.holdings,
         {
           id: uid(),
-          ticker: '',
+          ticker,
           compte: compteLabel,
           actions: 0,
           prix: 0,
@@ -293,9 +296,17 @@ export const PagePortefeuille = () => {
                         <button className="btn" onClick={() => dupliquerLigne(p.lignes[0])}>+ Dans un autre compte</button>
                       </div>
                     )}
-                    {p.lignes.length === 0 && (
-                      <div className="subtle" style={{ fontSize: 14 }}>
-                        Aucune ligne pour ce ticker. Ajoute un actif avec ce ticker pour commencer à suivre ta cible.
+                    {p.lignes.length === 0 && p.ticker && (
+                      <div className="row between center gap-10" style={{ flexWrap: 'wrap' }}>
+                        <div className="subtle" style={{ fontSize: 14 }}>
+                          Aucune ligne pour ce ticker.
+                        </div>
+                        <button
+                          className="btn btn--primary"
+                          onClick={() => ajouterActif(labelsStrategie[0] ?? 'CELI', p.ticker)}
+                        >
+                          + Ajouter une ligne pour {p.ticker}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -303,6 +314,58 @@ export const PagePortefeuille = () => {
               );
             })}
           </div>
+
+          {holdingsPersoAComp.length > 0 && (
+            <div className="stack mt-14 gap-10" style={{ borderTop: '1px dashed #cfd3d7', paddingTop: 14 }}>
+              <div className="row between center gap-10" style={{ flexWrap: 'wrap' }}>
+                <div className="section-label" style={{ margin: 0 }}>À compléter</div>
+                <div className="subtle" style={{ fontSize: 13 }}>Renseigne le ticker pour qu'il rejoigne sa ligne.</div>
+              </div>
+              {holdingsPersoAComp.map((h) => (
+                <div key={h.id} className="grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', alignItems: 'end' }}>
+                  <label className="field">
+                    <span className="field__label">Ticker</span>
+                    <input
+                      className="field__input"
+                      style={{ fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 20, letterSpacing: '0.04em', textTransform: 'uppercase' }}
+                      placeholder="TICKER"
+                      value={h.ticker}
+                      onChange={(e) => setHolding(h.id, { ticker: e.target.value.toUpperCase() })}
+                    />
+                  </label>
+                  <label className="field">
+                    <span className="field__label">Compte</span>
+                    <select
+                      className="field__input"
+                      style={{ fontSize: 18 }}
+                      value={h.compte}
+                      onChange={(e) => setHolding(h.id, { compte: e.target.value })}
+                    >
+                      {COMPTES_HOLDING.map((cLbl) => (
+                        <option key={cLbl} value={cLbl}>{cLbl}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span className="field__label">Quantité</span>
+                    <NumInput className="field__input" style={{ fontSize: 20 }} value={h.actions}
+                      onChange={(n) => setHolding(h.id, { actions: n })} />
+                  </label>
+                  <label className="field">
+                    <span className="field__label">Prix ($)</span>
+                    <NumInput className="field__input" style={{ fontSize: 20 }} value={h.prix}
+                      onChange={(n) => setHolding(h.id, { prix: n })} />
+                  </label>
+                  <div className="row gap-6" style={{ paddingBottom: 6 }}>
+                    <div className="mono-cond" style={{ fontSize: 18, flex: 1, textAlign: 'right' }}>
+                      {money(h.actions * h.prix)}
+                    </div>
+                    <button className="btn" onClick={() => removeHolding(h.id)}>×</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="grid mt-16" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 18, borderTop: '2px solid #1d1f20', paddingTop: 16 }}>
             <label className="field">
