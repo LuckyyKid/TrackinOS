@@ -78,9 +78,11 @@ export const projection = (
 };
 
 export type PortefeuillePos = {
-  h: Holding;
+  ticker: string;
+  lignes: Holding[];
   valeur: number;
   poids: number;
+  cible: number; // 0..1
   derive: number; // poids - cible
   besoin: number; // avant prorata
   achat: number; // après prorata
@@ -93,17 +95,45 @@ export const analysePortefeuille = (data: FinanceData): {
   prochaineContribution: number;
 } => {
   const prochaineContribution = data.comptes.reduce((s, c) => s + c.parCycle, 0);
-  const valeurs = data.holdings.map((h) => h.actions * h.prix);
-  const total = valeurs.reduce((s, v) => s + v, 0);
+
+  const parTicker = new Map<string, Holding[]>();
+  data.holdings.forEach((h) => {
+    if (!h.ticker) return;
+    const arr = parTicker.get(h.ticker) ?? [];
+    arr.push(h);
+    parTicker.set(h.ticker, arr);
+  });
+
+  const cibleParTicker = new Map<string, number>();
+  data.cibles.forEach((c) => {
+    if (c.ticker) cibleParTicker.set(c.ticker, c.part);
+  });
+
+  const tickers: string[] = [];
+  data.cibles.forEach((c) => {
+    if (c.ticker && !tickers.includes(c.ticker)) tickers.push(c.ticker);
+  });
+  parTicker.forEach((_, t) => {
+    if (!tickers.includes(t)) tickers.push(t);
+  });
+
+  const valeurs = new Map<string, number>();
+  tickers.forEach((t) => {
+    const lignes = parTicker.get(t) ?? [];
+    valeurs.set(t, lignes.reduce((s, h) => s + h.actions * h.prix, 0));
+  });
+  const total = Array.from(valeurs.values()).reduce((s, v) => s + v, 0);
   const totalCible = total + prochaineContribution;
 
-  const positions: PortefeuillePos[] = data.holdings.map((h, i) => {
-    const valeur = valeurs[i];
+  const positions: PortefeuillePos[] = tickers.map((ticker) => {
+    const lignes = parTicker.get(ticker) ?? [];
+    const valeur = valeurs.get(ticker) ?? 0;
     const poids = total > 0 ? valeur / total : 0;
-    const derive = poids - h.cible;
-    const besoin = Math.max(0, totalCible * h.cible - valeur);
-    const aCorriger = Math.abs(derive) > data.reequilibrage.tolerance / 100;
-    return { h, valeur, poids, derive, besoin, achat: 0, aCorriger };
+    const cible = cibleParTicker.get(ticker) ?? 0;
+    const derive = poids - cible;
+    const besoin = Math.max(0, totalCible * cible - valeur);
+    const aCorriger = cible > 0 && Math.abs(derive) > data.reequilibrage.tolerance / 100;
+    return { ticker, lignes, valeur, poids, cible, derive, besoin, achat: 0, aCorriger };
   });
 
   const besoinTotal = positions.reduce((s, p) => s + p.besoin, 0);
@@ -112,7 +142,6 @@ export const analysePortefeuille = (data: FinanceData): {
   } else if (besoinTotal <= prochaineContribution) {
     positions.forEach((p) => (p.achat = p.besoin));
   } else {
-    // prorata
     const facteur = prochaineContribution / besoinTotal;
     positions.forEach((p) => (p.achat = p.besoin * facteur));
   }

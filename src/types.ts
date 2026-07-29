@@ -58,7 +58,11 @@ export type Holding = {
   compte: string;
   actions: number;
   prix: number;
-  cible: number; // 0..1
+};
+
+export type Cible = {
+  ticker: string;
+  part: number; // 0..1
 };
 
 export const COMPTES_HOLDING = ['CELIAPP', 'CELI', 'CELI enfant', 'Wealthsimple'] as const;
@@ -100,6 +104,7 @@ export type FinanceData = {
   carte: Carte;
   comptes: CompteInvest[];
   holdings: Holding[];
+  cibles: Cible[];
   reequilibrage: Reequilibrage;
   rendementAnnuel: number;
   celi: CeliConfig;
@@ -144,10 +149,15 @@ export const DEFAULT_DATA: FinanceData = {
     { id: 'crypto', nom: 'Crypto', simple: 'Placements Wealthsimple', valeur: 4301, parCycle: 50, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0 },
   ],
   holdings: [
-    { id: 'h_spus_celi', ticker: 'SPUS', compte: 'CELI', actions: 0, prix: 0, cible: 0.40 },
-    { id: 'h_upro_celi', ticker: 'UPRO', compte: 'CELI', actions: 0, prix: 0, cible: 0.20 },
-    { id: 'h_xef_celi', ticker: 'XEF', compte: 'CELI', actions: 0, prix: 0, cible: 0.40 },
-    { id: 'h_xeqt_enfant', ticker: 'XEQT', compte: 'CELI enfant', actions: 0, prix: 0, cible: 1.00 },
+    { id: 'h_spus_celi', ticker: 'SPUS', compte: 'CELI', actions: 0, prix: 0 },
+    { id: 'h_upro_celi', ticker: 'UPRO', compte: 'CELI', actions: 0, prix: 0 },
+    { id: 'h_xef_celi', ticker: 'XEF', compte: 'CELI', actions: 0, prix: 0 },
+    { id: 'h_xeqt_enfant', ticker: 'XEQT', compte: 'CELI enfant', actions: 0, prix: 0 },
+  ],
+  cibles: [
+    { ticker: 'SPUS', part: 0.40 },
+    { ticker: 'UPRO', part: 0.20 },
+    { ticker: 'XEF', part: 0.40 },
   ],
   reequilibrage: { tolerance: 5, horizon: 3 },
   rendementAnnuel: 6.5,

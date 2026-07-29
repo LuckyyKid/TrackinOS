@@ -98,16 +98,22 @@ t('portefeuille: prorata when needs exceed contribution', () => {
 });
 
 t('portefeuille: no achat when already balanced', () => {
-  // On teste sur le portefeuille adulte seul (le CELI enfant a son propre pool)
-  const adulte = DEFAULT_DATA.holdings.filter((h) => h.compte !== 'CELI enfant');
-  const data = {
-    ...DEFAULT_DATA,
-    holdings: adulte.map((h) => ({ ...h, actions: h.cible * 1000, prix: 1, cible: h.cible })),
-  };
-  const total = data.holdings.reduce((s, h) => s + h.actions * h.prix, 0);
-  data.holdings = data.holdings.map((h) => ({ ...h, actions: total * h.cible }));
+  // Cibles définies globalement par ticker (nouveau modèle)
+  const cibleParTicker = new Map<string, number>();
+  DEFAULT_DATA.cibles.forEach((c) => cibleParTicker.set(c.ticker, c.part));
+  // On garde uniquement les tickers avec une cible (le CELI enfant XEQT n'en a pas)
+  const holdings = DEFAULT_DATA.holdings
+    .filter((h) => cibleParTicker.has(h.ticker))
+    .map((h) => ({
+      ...h,
+      actions: (cibleParTicker.get(h.ticker) ?? 0) * 1000,
+      prix: 1,
+    }));
+  const data = { ...DEFAULT_DATA, holdings };
   const { positions } = analysePortefeuille(data);
-  positions.forEach((p) => assert.ok(!p.aCorriger, `${p.h.ticker} should be within tolerance`));
+  positions.forEach((p) => {
+    if (p.cible > 0) assert.ok(!p.aCorriger, `${p.ticker} should be within tolerance`);
+  });
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

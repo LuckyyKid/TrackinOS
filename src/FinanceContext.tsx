@@ -25,19 +25,41 @@ const KEY = 'cyclepay.finance.v1';
 const uid = (): string =>
   'h_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
 
-const merge = (loaded: Partial<FinanceData>): FinanceData => ({
-  ...DEFAULT_DATA,
-  ...loaded,
-  celi: { ...DEFAULT_DATA.celi, ...(loaded.celi ?? {}) },
-  celiapp: { ...DEFAULT_DATA.celiapp, ...(loaded.celiapp ?? {}) },
-  reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
-  coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },
-  carte: { ...DEFAULT_DATA.carte, ...(loaded.carte ?? {}) },
-  holdings: (loaded.holdings ?? DEFAULT_DATA.holdings).map((h) => ({
-    ...h,
+const merge = (loaded: Partial<FinanceData>): FinanceData => {
+  const rawHoldings = (loaded.holdings ?? DEFAULT_DATA.holdings) as Array<
+    FinanceData['holdings'][number] & { cible?: number }
+  >;
+  const holdings = rawHoldings.map((h) => ({
     id: h.id ?? uid(),
-  })),
-});
+    ticker: h.ticker,
+    compte: h.compte,
+    actions: h.actions,
+    prix: h.prix,
+  }));
+  let cibles = loaded.cibles;
+  if (!cibles) {
+    const seen = new Map<string, number>();
+    rawHoldings.forEach((h) => {
+      if (h.ticker && typeof h.cible === 'number' && !seen.has(h.ticker)) {
+        seen.set(h.ticker, h.cible);
+      }
+    });
+    cibles = seen.size
+      ? Array.from(seen, ([ticker, part]) => ({ ticker, part }))
+      : DEFAULT_DATA.cibles;
+  }
+  return {
+    ...DEFAULT_DATA,
+    ...loaded,
+    celi: { ...DEFAULT_DATA.celi, ...(loaded.celi ?? {}) },
+    celiapp: { ...DEFAULT_DATA.celiapp, ...(loaded.celiapp ?? {}) },
+    reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
+    coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },
+    carte: { ...DEFAULT_DATA.carte, ...(loaded.carte ?? {}) },
+    holdings,
+    cibles,
+  };
+};
 
 const chargerInitial = (): FinanceData => {
   try {
