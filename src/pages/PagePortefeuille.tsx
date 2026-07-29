@@ -400,6 +400,19 @@ export const PagePortefeuille = () => {
                           />
                         </label>
                         <label className="field">
+                          <span className="field__label">Compte</span>
+                          <select
+                            className="field__input"
+                            style={{ fontSize: 18 }}
+                            value={h.compte}
+                            onChange={(e) => setHolding(h.id, { compte: e.target.value })}
+                          >
+                            {COMPTES_HOLDING.map((cLbl) => (
+                              <option key={cLbl} value={cLbl}>{cLbl}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="field">
                           <span className="field__label">Quantité</span>
                           <NumInput className="field__input" style={{ fontSize: 20 }} value={h.actions}
                             onChange={(n) => setHolding(h.id, { actions: n })} />
