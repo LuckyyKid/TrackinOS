@@ -77,6 +77,38 @@ export const projection = (
   return points;
 };
 
+export type ProjectionFinAnnee = {
+  annee: number;
+  moisRestants: number;
+  valeurProjetee: number;
+  contributionsRestantes: number;
+  gainsProjetes: number;
+};
+
+export const projectionFinAnnee = (
+  data: FinanceData,
+  valeurDepart: number,
+  today = new Date(),
+): ProjectionFinAnnee => {
+  const annee = today.getFullYear();
+  const moisRestants = Math.max(0, 12 - (today.getMonth() + 1));
+  const rMois = rendementMensuel(data.rendementAnnuel);
+  const contribMensuelle = data.comptes.reduce((s, c) => s + c.parCycle * 2, 0);
+  let valeur = valeurDepart;
+  for (let m = 0; m < moisRestants; m++) {
+    valeur = valeur * (1 + rMois) + contribMensuelle;
+  }
+  const contributionsRestantes = contribMensuelle * moisRestants;
+  const gainsProjetes = valeur - valeurDepart - contributionsRestantes;
+  return {
+    annee,
+    moisRestants,
+    valeurProjetee: valeur,
+    contributionsRestantes,
+    gainsProjetes,
+  };
+};
+
 // ---------- Objectif financier ----------
 
 export const ageActuel = (naissance: string, today = new Date()): number | null => {

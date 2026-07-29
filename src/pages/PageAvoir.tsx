@@ -1,11 +1,13 @@
 import { useFinance } from '../FinanceContext';
-import { avoirTotal, money, pct } from '../calc';
+import { avoirTotal, money, moneySigned, pct, projectionFinAnnee } from '../calc';
 import { PageHeader } from '../App';
 import { Bar, Card } from '../ui';
 
 export const PageAvoir = () => {
   const { data } = useFinance();
   const { total, parts } = avoirTotal(data);
+  const fin = projectionFinAnnee(data, total);
+  const ecart = fin.valeurProjetee - total;
 
   const conic =
     total > 0
@@ -37,6 +39,29 @@ export const PageAvoir = () => {
             <div className="section-label section-label--md">Valeur totale</div>
             <div className="figure figure--xl mt-8">{money(total)}</div>
             <p className="help pretty">Somme de tous tes comptes et de ton coussin. La valeur des placements suit la quantité × prix que tu as saisis.</p>
+
+            {fin.moisRestants > 0 && (
+              <div
+                className="mt-24"
+                style={{ borderTop: '1px solid #e7e7ea', paddingTop: 18 }}
+              >
+                <div className="section-label">Cible fin {fin.annee} · pour rester on track</div>
+                <div className="row between center gap-14 mt-8" style={{ flexWrap: 'wrap' }}>
+                  <div className="mono-cond" style={{ fontSize: 34, color: '#1d2d3d' }}>
+                    {money(fin.valeurProjetee)}
+                  </div>
+                  <div className="mono-cond" style={{ fontSize: 18, color: '#416180' }}>
+                    {moneySigned(ecart)} vs aujourd'hui
+                  </div>
+                </div>
+                <p className="pretty mt-8" style={{ maxWidth: 660, fontSize: 15, color: '#424244' }}>
+                  Au rythme actuel ({fin.moisRestants} {fin.moisRestants === 1 ? 'mois restant' : 'mois restants'}),
+                  tu ajouterais <strong>{money(fin.contributionsRestantes)}</strong> de ta poche
+                  et tes placements gagneraient <strong>{money(fin.gainsProjetes)}</strong> à
+                  {' '}{pct(data.rendementAnnuel / 100)} annuel. Si tu es en dessous de cette cible en décembre, tu prends du retard.
+                </p>
+              </div>
+            )}
           </Card>
 
           <div className="grid grid-auto-290 gap-20" style={{ marginBottom: 24 }}>
