@@ -160,16 +160,16 @@ export const PageDepenses = () => {
                 opacity: d.actif ? 1 : 0.45,
               }}
             >
-              <div style={{ minWidth: 200, flex: '1 1 220px' }}>
-                <div className="cd" style={{ fontWeight: 600, fontSize: 23, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{d.nom}</div>
+              <div style={{ minWidth: 0, flex: '1 1 220px' }}>
+                <div className="cd" style={{ fontWeight: 600, fontSize: 'clamp(18px, 4.4vw, 23px)', textTransform: 'uppercase', letterSpacing: '0.03em', wordBreak: 'break-word' }}>{d.nom}</div>
                 <div className="muted" style={{ fontSize: 15 }}>{detail}</div>
               </div>
-              <div style={{ flex: '1 1 160px', minWidth: 120 }}>
+              <div style={{ flex: '1 1 140px', minWidth: 0 }}>
                 <div style={{ height: 10, background: '#e7e7ea' }}>
                   <div style={{ height: 10, background: barColor, width: `${barPct}%` }} />
                 </div>
               </div>
-              <div className="mono-cond" style={{ fontSize: 26, minWidth: 110, textAlign: 'right' }}>{money(d.montant)}</div>
+              <div className="mono-cond" style={{ fontSize: 'clamp(20px, 5vw, 26px)', minWidth: 96, textAlign: 'right' }}>{money(d.montant)}</div>
               <div className="row gap-8">
                 <button className="btn btn--sm" onClick={() => modifier(d.id, { actif: !d.actif })}>
                   {d.actif ? 'En pause' : 'Réactiver'}
@@ -256,9 +256,9 @@ const Assistant = ({
             emptyIsZero
             value={d.montant}
             onChange={(n) => set({ montant: n })}
-            style={{ width: 220, borderColor: '#5980a6', fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 44, padding: 18 }}
+            style={{ width: '100%', maxWidth: 220, borderColor: '#5980a6', fontFamily: "'Barlow Condensed'", fontWeight: 700, fontSize: 'clamp(32px, 8vw, 44px)', padding: 18 }}
           />
-          <span className="cd blue" style={{ fontWeight: 700, fontSize: 38 }}>$ par mois</span>
+          <span className="cd blue" style={{ fontWeight: 700, fontSize: 'clamp(24px, 6vw, 38px)' }}>$ par mois</span>
         </div>
       )}
 
@@ -293,7 +293,7 @@ const Assistant = ({
               value={d.jour}
               onChange={(n) => set({ jour: Math.max(1, n) })}
               className="field__input"
-              style={{ width: 130, borderColor: '#5980a6', fontSize: 24, padding: 16 }}
+              style={{ width: '100%', maxWidth: 130, borderColor: '#5980a6', fontSize: 24, padding: 16 }}
             />
           </div>
         </div>

@@ -53,7 +53,7 @@ export const PagePaies = () => {
                 </label>
                 <label className="field">
                   <span className="field__label">Quel jour du mois</span>
-                  <NumInput className="field__input" style={{ width: 120 }} integer min={1} max={31} value={c.jour}
+                  <NumInput className="field__input" style={{ width: '100%', maxWidth: 120 }} integer min={1} max={31} value={c.jour}
                     onChange={(n) => set(i as 0 | 1, { jour: Math.max(1, n) })} />
                 </label>
               </div>

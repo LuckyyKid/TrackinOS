@@ -152,7 +152,9 @@ export const PagePortefeuille = () => {
                 value={c.ticker}
                 onChange={(e) => setCible(i, { ticker: e.target.value.toUpperCase() })}
                 style={{
-                  width: 160,
+                  flex: '1 1 140px',
+                  minWidth: 0,
+                  maxWidth: 200,
                   fontFamily: "'Barlow Condensed'",
                   fontWeight: 700,
                   fontSize: 22,
@@ -162,7 +164,7 @@ export const PagePortefeuille = () => {
               />
               <NumInput
                 className="field__input"
-                style={{ width: 110, fontSize: 20 }}
+                style={{ width: '100%', maxWidth: 110, flex: '0 1 110px', fontSize: 20 }}
                 value={c.part * 100}
                 onChange={(n) => setCible(i, { part: n / 100 })}
               />
@@ -238,7 +240,7 @@ export const PagePortefeuille = () => {
           </div>
         </Card>
 
-        <div style={{ border: '1px solid #cfd3d7', padding: 26, minWidth: 280 }}>
+        <div style={{ border: '1px solid #cfd3d7', padding: 'clamp(16px, 4vw, 26px)' }}>
           <div className="row between center gap-10" style={{ flexWrap: 'wrap' }}>
             <div className="section-label">Mes actifs (perso)</div>
             <button
@@ -392,12 +394,12 @@ export const PagePortefeuille = () => {
           <div className="grid mt-16" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 18, borderTop: '2px solid #1d1f20', paddingTop: 16 }}>
             <label className="field">
               <span className="field__label">Je corrige si l'écart dépasse (%)</span>
-              <NumInput className="field__input" style={{ width: 110, fontSize: 20 }} value={data.reequilibrage.tolerance}
+              <NumInput className="field__input" style={{ width: '100%', maxWidth: 110, fontSize: 20 }} value={data.reequilibrage.tolerance}
                 onChange={(n) => setReequilibrage({ tolerance: n })} />
             </label>
             <label className="field">
               <span className="field__label">Je corrige sur (mois)</span>
-              <NumInput className="field__input" style={{ width: 110, fontSize: 20 }} integer value={data.reequilibrage.horizon}
+              <NumInput className="field__input" style={{ width: '100%', maxWidth: 110, fontSize: 20 }} integer value={data.reequilibrage.horizon}
                 onChange={(n) => setReequilibrage({ horizon: n })} />
             </label>
             <div>

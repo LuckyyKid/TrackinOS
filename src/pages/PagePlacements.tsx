@@ -285,15 +285,16 @@ export const PagePlacements = () => {
           <NumInput
             className="field__input"
             style={{
-              width: 130,
+              width: '100%',
+              maxWidth: 130,
               fontFamily: "'Barlow Condensed'",
               fontWeight: 700,
-              fontSize: 34,
+              fontSize: 'clamp(26px, 6vw, 34px)',
             }}
             value={data.rendementAnnuel}
             onChange={(n) => setData((x) => ({ ...x, rendementAnnuel: n }))}
           />
-          <span className="cd blue" style={{ fontWeight: 700, fontSize: 30 }}>% par année</span>
+          <span className="cd blue" style={{ fontWeight: 700, fontSize: 'clamp(22px, 5vw, 30px)' }}>% par année</span>
         </div>
       </div>
     </>
