@@ -28,6 +28,7 @@ const merge = (loaded: Partial<FinanceData>): FinanceData => ({
   celi: { ...DEFAULT_DATA.celi, ...(loaded.celi ?? {}) },
   celiapp: { ...DEFAULT_DATA.celiapp, ...(loaded.celiapp ?? {}) },
   reer: { ...DEFAULT_DATA.reer, ...(loaded.reer ?? {}) },
+  reee: { ...DEFAULT_DATA.reee, ...(loaded.reee ?? {}) },
   objectif: { ...DEFAULT_DATA.objectif, ...(loaded.objectif ?? {}) },
   reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
   coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },

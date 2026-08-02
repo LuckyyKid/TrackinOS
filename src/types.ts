@@ -9,6 +9,7 @@ export type TypeCompte =
   | 'CELI'
   | 'CELIAPP'
   | 'REER'
+  | 'REEE'
   | 'NON_ENREGISTRE'
   | 'CRYPTO'
   | 'AUTRE';
@@ -17,6 +18,7 @@ export const TYPES_COMPTE: Array<{ id: TypeCompte; label: string; description: s
   { id: 'CELI', label: 'CELI', description: 'Compte d\u2019épargne libre d\u2019impôt', aPlafond: true },
   { id: 'CELIAPP', label: 'CELIAPP', description: 'Compte d\u2019épargne pour la première maison', aPlafond: true },
   { id: 'REER', label: 'REER', description: 'Régime enregistré d\u2019épargne-retraite', aPlafond: true },
+  { id: 'REEE', label: 'REEE', description: 'Régime enregistré d\u2019épargne-études (subventionné par le gouvernement)', aPlafond: true },
   { id: 'NON_ENREGISTRE', label: 'Non enregistré', description: 'Compte de placement imposable', aPlafond: false },
   { id: 'CRYPTO', label: 'Crypto', description: 'Cryptomonnaies', aPlafond: false },
   { id: 'AUTRE', label: 'Autre', description: 'Compte personnalisé', aPlafond: false },
@@ -108,6 +110,25 @@ export type ReerConfig = {
   droitsReport: number; // droits inutilisés reportés au tout début (souvent 0 si nouveau)
 };
 
+// REEE : régime enregistré d'épargne-études. Config PAR compte (un enfant = un compte).
+// Chaque bénéficiaire a son propre plafond à vie et ses propres droits à la SCEE / IQEE.
+export type ReeeCompteConfig = {
+  cotisations: Record<number, number>; // cotisations par année pour ce bénéficiaire
+  iqeeActif: boolean; // active le calcul de l'IQEE (Québec 10 %)
+  sceeRecuAvant: number; // SCEE déjà reçue avant le suivi dans l'app (souvent 0)
+  iqeeRecuAvant: number; // IQEE déjà reçu avant le suivi dans l'app
+  anneeNaissanceBeneficiaire: number; // 0 si inconnu — utilisé pour l'info seulement
+};
+
+// Plafonds REEE (par bénéficiaire, pas partagés)
+export const REEE_PLAFOND_VIE = 50000;
+export const REEE_SCEE_TAUX = 0.20; // 20 % du gouvernement fédéral (base)
+export const REEE_SCEE_ANNUELLE_MAX = 500; // sur les premiers 2 500 $/an
+export const REEE_SCEE_VIE_MAX = 7200;
+export const REEE_IQEE_TAUX = 0.10; // 10 % Québec (base)
+export const REEE_IQEE_ANNUELLE_MAX = 250; // sur les premiers 2 500 $/an
+export const REEE_IQEE_VIE_MAX = 3600;
+
 export type ObjectifFinancier = {
   montant: number;
   ageCible: number;
@@ -143,6 +164,7 @@ export type FinanceData = {
   celi: CeliConfig;
   celiapp: CeliappConfig;
   reer: ReerConfig;
+  reee: Record<string, ReeeCompteConfig>; // clé = compte.id du REEE
   objectif: ObjectifFinancier;
 };
 
@@ -183,8 +205,17 @@ export const DEFAULT_DATA: FinanceData = {
     cotisations: {},
     droitsReport: 0,
   },
+  reee: {},
   objectif: {
     montant: 1000000,
     ageCible: 45,
   },
+};
+
+export const REEE_COMPTE_DEFAULT: ReeeCompteConfig = {
+  cotisations: {},
+  iqeeActif: false,
+  sceeRecuAvant: 0,
+  iqeeRecuAvant: 0,
+  anneeNaissanceBeneficiaire: 0,
 };

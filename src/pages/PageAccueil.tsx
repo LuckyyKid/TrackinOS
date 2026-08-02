@@ -101,7 +101,7 @@ export const PageAccueil = ({ go }: { go: (p: PageId) => void }) => {
           </p>
           <div className="divider" />
           <div className="grid grid-auto-190 gap-20">
-            <Fact label="Je place chaque mois" value={money(invest)} note="CELIAPP, CELI, crypto" />
+            <Fact label="Je place chaque mois" value={money(invest)} note="Tous tes comptes de placement" />
             <Fact label="Mes factures fixes" value={money(fixe)} note="Loyer, électricité, assurances" />
             <Fact label="Sur ma carte de crédit" value={money(surCarte)} note="À rembourser ce mois-ci" />
             <Fact label="Libre dans le mois" value={money(libre)} note="Les deux paies ensemble" />
@@ -139,7 +139,7 @@ export const PageAccueil = ({ go }: { go: (p: PageId) => void }) => {
           <Card style={{ padding: 26 }} plus="tl">
             <div className="section-label">Ce mois-ci</div>
             <div className="grid grid-auto-190 gap-20 mt-14">
-              <Fact label="Je place chaque mois" value={money(invest)} note="CELIAPP, CELI, crypto" />
+              <Fact label="Je place chaque mois" value={money(invest)} note="Tous tes comptes de placement" />
               <Fact label="Mes factures fixes" value={money(fixe)} note="Loyer, électricité, assurances" />
               <Fact label="Sur ma carte de crédit" value={money(surCarte)} note="À rembourser ce mois-ci" />
               <Fact label="Libre dans le mois" value={money(libre)} note="Les deux paies ensemble" />

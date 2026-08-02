@@ -36,11 +36,16 @@ export const PagePlacements = () => {
       )
     )
       return;
-    setData((x) => ({
-      ...x,
-      comptes: x.comptes.filter((c) => c.id !== id),
-      holdings: x.holdings.filter((h) => h.compte !== id),
-    }));
+    setData((x) => {
+      const nextReee = { ...(x.reee ?? {}) };
+      delete nextReee[id];
+      return {
+        ...x,
+        comptes: x.comptes.filter((c) => c.id !== id),
+        holdings: x.holdings.filter((h) => h.compte !== id),
+        reee: nextReee,
+      };
+    });
   };
 
   const ajouterCompte = () => {

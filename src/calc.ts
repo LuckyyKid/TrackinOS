@@ -6,9 +6,21 @@ import type {
   Depense,
   FinanceData,
   Holding,
+  ReeeCompteConfig,
   TypeCompte,
 } from './types';
-import { CELI_PLAFONDS_OFFICIELS, REER_PLAFONDS_MAX } from './types';
+import {
+  CELI_PLAFONDS_OFFICIELS,
+  REEE_COMPTE_DEFAULT,
+  REEE_IQEE_ANNUELLE_MAX,
+  REEE_IQEE_TAUX,
+  REEE_IQEE_VIE_MAX,
+  REEE_PLAFOND_VIE,
+  REEE_SCEE_ANNUELLE_MAX,
+  REEE_SCEE_TAUX,
+  REEE_SCEE_VIE_MAX,
+  REER_PLAFONDS_MAX,
+} from './types';
 
 export const money = (n: number): string => {
   const sign = n < 0 ? '\u2212 ' : '';
@@ -475,6 +487,119 @@ export const reerCotiseCetteAnnee = (data: FinanceData, today = new Date()): num
 
 export const reerValeurTotale = (data: FinanceData): number => valeurTypeCompte(data, 'REER');
 
+// ---------- REEE (par compte / par enfant) ----------
+
+export const reeeConfig = (data: FinanceData, compteId: string): ReeeCompteConfig =>
+  data.reee?.[compteId] ?? REEE_COMPTE_DEFAULT;
+
+// SCEE annuelle : 20 % des premiers 2 500 $ cotisés → max 500 $/an
+export const reeeSceeAnnuelle = (cotisationAnnee: number): number =>
+  Math.min(cotisationAnnee * REEE_SCEE_TAUX, REEE_SCEE_ANNUELLE_MAX);
+
+// IQEE Québec annuelle : 10 % des premiers 2 500 $ → max 250 $/an
+export const reeeIqeeAnnuelle = (cotisationAnnee: number): number =>
+  Math.min(cotisationAnnee * REEE_IQEE_TAUX, REEE_IQEE_ANNUELLE_MAX);
+
+export const reeeCotisationsCumulees = (data: FinanceData, compteId: string, today = new Date()): number => {
+  const cfg = reeeConfig(data, compteId);
+  const anneeCourante = today.getFullYear();
+  let s = 0;
+  for (const [k, v] of Object.entries(cfg.cotisations ?? {})) {
+    if (Number(k) <= anneeCourante) s += v || 0;
+  }
+  return s;
+};
+
+export const reeeCotiseCetteAnnee = (data: FinanceData, compteId: string, today = new Date()): number =>
+  reeeConfig(data, compteId).cotisations?.[today.getFullYear()] ?? 0;
+
+export const reeeDisponible = (data: FinanceData, compteId: string, today = new Date()): number =>
+  REEE_PLAFOND_VIE - reeeCotisationsCumulees(data, compteId, today);
+
+// SCEE totale reçue à date (bornée par le plafond à vie 7 200 $)
+export const reeeSceeTotale = (data: FinanceData, compteId: string, today = new Date()): number => {
+  const cfg = reeeConfig(data, compteId);
+  const anneeCourante = today.getFullYear();
+  let cumul = Math.max(0, cfg.sceeRecuAvant || 0);
+  const annees = Object.keys(cfg.cotisations ?? {})
+    .map(Number)
+    .filter((y) => !Number.isNaN(y) && y <= anneeCourante)
+    .sort((a, b) => a - b);
+  for (const y of annees) {
+    const cotis = cfg.cotisations[y] || 0;
+    const scee = reeeSceeAnnuelle(cotis);
+    cumul += Math.max(0, Math.min(scee, REEE_SCEE_VIE_MAX - cumul));
+    if (cumul >= REEE_SCEE_VIE_MAX) break;
+  }
+  return Math.min(cumul, REEE_SCEE_VIE_MAX);
+};
+
+// IQEE totale (Québec) — 0 si toggle inactif
+export const reeeIqeeTotale = (data: FinanceData, compteId: string, today = new Date()): number => {
+  const cfg = reeeConfig(data, compteId);
+  if (!cfg.iqeeActif) return 0;
+  const anneeCourante = today.getFullYear();
+  let cumul = Math.max(0, cfg.iqeeRecuAvant || 0);
+  const annees = Object.keys(cfg.cotisations ?? {})
+    .map(Number)
+    .filter((y) => !Number.isNaN(y) && y <= anneeCourante)
+    .sort((a, b) => a - b);
+  for (const y of annees) {
+    const cotis = cfg.cotisations[y] || 0;
+    const iqee = reeeIqeeAnnuelle(cotis);
+    cumul += Math.max(0, Math.min(iqee, REEE_IQEE_VIE_MAX - cumul));
+    if (cumul >= REEE_IQEE_VIE_MAX) break;
+  }
+  return Math.min(cumul, REEE_IQEE_VIE_MAX);
+};
+
+// Projection de croissance pour UN compte (utile surtout pour REEE : ajoute le match gouvernemental)
+export const projectionCompte = (
+  data: FinanceData,
+  compteId: string,
+  annees: number,
+): ProjectionPoint[] => {
+  const compte = data.comptes.find((c) => c.id === compteId);
+  if (!compte) return [];
+  const rMois = rendementMensuel(data.rendementAnnuel);
+  const contribMensuelle = compte.parCycle * 2;
+  const cotisationAnnuelle = contribMensuelle * 12;
+  const depart = valeurCompte(data, compteId);
+  const isReee = compte.typeCompte === 'REEE';
+  const cfg = isReee ? reeeConfig(data, compteId) : null;
+
+  // Suivi des plafonds cumulatifs pour SCEE / IQEE
+  let sceeCumul = isReee ? reeeSceeTotale(data, compteId) : 0;
+  let iqeeCumul = isReee && cfg?.iqeeActif ? reeeIqeeTotale(data, compteId) : 0;
+  let cotisReeeCumul = isReee ? reeeCotisationsCumulees(data, compteId) : 0;
+
+  const points: ProjectionPoint[] = [{ annee: 0, valeur: depart, investi: depart }];
+  let valeur = depart;
+  let investi = depart;
+
+  for (let m = 1; m <= annees * 12; m++) {
+    valeur = valeur * (1 + rMois) + contribMensuelle;
+    investi = investi + contribMensuelle;
+
+    if (m % 12 === 0) {
+      if (isReee) {
+        // Bloquer la cotisation si on dépasse le plafond à vie
+        const cotisEffective = Math.min(cotisationAnnuelle, Math.max(0, REEE_PLAFOND_VIE - cotisReeeCumul));
+        cotisReeeCumul += cotisEffective;
+        const sceeAn = Math.min(reeeSceeAnnuelle(cotisEffective), Math.max(0, REEE_SCEE_VIE_MAX - sceeCumul));
+        sceeCumul += sceeAn;
+        const iqeeAn = cfg?.iqeeActif
+          ? Math.min(reeeIqeeAnnuelle(cotisEffective), Math.max(0, REEE_IQEE_VIE_MAX - iqeeCumul))
+          : 0;
+        iqeeCumul += iqeeAn;
+        valeur += sceeAn + iqeeAn;
+      }
+      points.push({ annee: m / 12, valeur, investi });
+    }
+  }
+  return points;
+};
+
 // ---------- Avoir total ----------
 
 export type PartAvoir = {
@@ -617,6 +742,24 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
       });
     }
   }
+  comptesParType(data, 'REEE').forEach((c) => {
+    const dispo = reeeDisponible(data, c.id, today);
+    if (dispo < 0) {
+      out.push({
+        id: `reee-depasse-${c.id}`,
+        titre: `REEE ${c.nom} : plafond à vie dépassé`,
+        detail: `Tu as cotisé ${money(-dispo)} de trop sur le plafond à vie de ${money(REEE_PLAFOND_VIE)}. Pénalité de 1 % par mois sur le trop-plein.`,
+        cible: 'plafonds',
+      });
+    } else if (dispo < 1000) {
+      out.push({
+        id: `reee-presque-${c.id}`,
+        titre: `REEE ${c.nom} : bientôt plein`,
+        detail: `Il te reste ${money(dispo)} de droits sur le plafond à vie.`,
+        cible: 'plafonds',
+      });
+    }
+  });
   return out;
 };
 

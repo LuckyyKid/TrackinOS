@@ -24,7 +24,7 @@ export const PageAvoir = () => {
       <PageHeader
         section="Vue d'ensemble"
         title="Mon avoir total"
-        help="Tout ce que tu possèdes, en un seul endroit — CELIAPP, CELI, portefeuille enfant, crypto et fond d'urgence."
+        help="Tout ce que tu possèdes, en un seul endroit — tes comptes de placement et ton fond d'urgence."
       />
 
       {total === 0 ? (
