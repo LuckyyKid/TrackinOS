@@ -1,9 +1,26 @@
 export type CycleId = 'cycle1' | 'cycle2';
 export type CycleCible = CycleId | 'deux';
 export type Categorie = 'fixe' | 'variable' | 'investissement' | 'epargne' | 'dette';
-export type CompteSrc = 'cheques' | 'credit' | 'CELIAPP' | 'CELI' | 'CELI_ENFANT' | 'wealthsimple';
+export type CompteSrc = 'cheques' | 'credit' | 'placement';
 export type Recurrence = 'mensuel' | 'deux_semaines' | 'annuel' | 'unique';
-export type CompteInvestId = 'celiapp' | 'celi' | 'celi_enfant' | 'crypto';
+
+// Types de comptes d'investissement supportés (choix générique pour tout utilisateur)
+export type TypeCompte =
+  | 'CELI'
+  | 'CELIAPP'
+  | 'REER'
+  | 'NON_ENREGISTRE'
+  | 'CRYPTO'
+  | 'AUTRE';
+
+export const TYPES_COMPTE: Array<{ id: TypeCompte; label: string; description: string; aPlafond: boolean }> = [
+  { id: 'CELI', label: 'CELI', description: 'Compte d\u2019épargne libre d\u2019impôt', aPlafond: true },
+  { id: 'CELIAPP', label: 'CELIAPP', description: 'Compte d\u2019épargne pour la première maison', aPlafond: true },
+  { id: 'REER', label: 'REER', description: 'Régime enregistré d\u2019épargne-retraite', aPlafond: true },
+  { id: 'NON_ENREGISTRE', label: 'Non enregistré', description: 'Compte de placement imposable', aPlafond: false },
+  { id: 'CRYPTO', label: 'Crypto', description: 'Cryptomonnaies', aPlafond: false },
+  { id: 'AUTRE', label: 'Autre', description: 'Compte personnalisé', aPlafond: false },
+];
 
 export type Cycle = {
   id: CycleId;
@@ -25,7 +42,7 @@ export type Depense = {
   categorie: Categorie;
   jour: number;
   cycle: CycleCible;
-  compte: CompteSrc;
+  compte: string; // libre : cheques, credit, ou n'importe quel nom / id de compte d'investissement
   recurrence: Recurrence;
   actif: boolean;
 };
@@ -40,24 +57,22 @@ export type Carte = {
   autopayMontant: number;
 };
 
+// Un compte d'investissement. L'id est généré, le nom est libre, le typeCompte détermine le plafond.
 export type CompteInvest = {
-  id: CompteInvestId;
+  id: string;
   nom: string;
-  simple: string;
-  valeur: number;
-  parCycle: number;
-  annee: number;
-  plafondAnnuel: number;
-  plafondVie: number;
-  utilise: number;
-  cash: number;
-  dansStrategie: boolean;
+  typeCompte: TypeCompte;
+  simple: string; // description libre
+  valeur: number; // valeur saisie manuellement (croisement)
+  parCycle: number; // versement à chaque paie
+  cash: number; // cash non investi dans le compte
+  dansStrategie: boolean; // inclus dans la stratégie de répartition
 };
 
 export type Holding = {
   id: string;
   ticker: string;
-  compte: string;
+  compte: string; // id du compte d'investissement
   actions: number;
   prix: number;
 };
@@ -66,9 +81,6 @@ export type Cible = {
   ticker: string;
   part: number; // 0..1
 };
-
-export const COMPTES_HOLDING = ['CELIAPP', 'CELI', 'CELI enfant', 'Wealthsimple'] as const;
-export type CompteHolding = (typeof COMPTES_HOLDING)[number];
 
 export type Reequilibrage = {
   tolerance: number; // pourcentage
@@ -88,9 +100,17 @@ export type CeliappConfig = {
   plafondVie: number; // 40 000 $ par défaut
 };
 
+// REER : le plafond de l'année N vient de 18% du revenu gagné en N-1, plafonné au max CRA de N.
+// L'utilisateur saisit ses revenus par année ; on calcule les droits.
+export type ReerConfig = {
+  revenusAnneesPrecedentes: Record<number, number>; // revenu gagné dans l'année (utilisé pour calculer les droits de l'année suivante)
+  cotisations: Record<number, number>;
+  droitsReport: number; // droits inutilisés reportés au tout début (souvent 0 si nouveau)
+};
+
 export type ObjectifFinancier = {
-  montant: number; // ex: 2 000 000
-  ageCible: number; // ex: 45
+  montant: number;
+  ageCible: number;
 };
 
 // Plafonds officiels CRA du CELI par année
@@ -102,6 +122,12 @@ export const CELI_PLAFONDS_OFFICIELS: Record<number, number> = {
   2019: 6000, 2020: 6000, 2021: 6000, 2022: 6000,
   2023: 6500,
   2024: 7000, 2025: 7000, 2026: 7000,
+};
+
+// Plafonds annuels maximums CRA du REER (le plafond individuel = min(18% revenu N-1, ce max))
+export const REER_PLAFONDS_MAX: Record<number, number> = {
+  2019: 26500, 2020: 27230, 2021: 27830, 2022: 29210, 2023: 30780,
+  2024: 31560, 2025: 32490, 2026: 33810,
 };
 
 export type FinanceData = {
@@ -116,57 +142,29 @@ export type FinanceData = {
   rendementAnnuel: number;
   celi: CeliConfig;
   celiapp: CeliappConfig;
+  reer: ReerConfig;
   objectif: ObjectifFinancier;
 };
 
 export const DEFAULT_DATA: FinanceData = {
   cycles: [
-    { id: 'cycle1', label: 'Paie du 1er', montant: 2340, jour: 1 },
-    { id: 'cycle2', label: 'Paie du 15', montant: 2340, jour: 15 },
+    { id: 'cycle1', label: 'Paie du 1er', montant: 0, jour: 1 },
+    { id: 'cycle2', label: 'Paie du 15', montant: 0, jour: 15 },
   ],
-  coussin: { actuel: 1850, objectif: 4000, minimum: 1200 },
-  depenses: [
-    { id: 'd1', nom: 'Loyer', montant: 1150, categorie: 'fixe', jour: 1, cycle: 'cycle1', compte: 'cheques', recurrence: 'mensuel', actif: true },
-    { id: 'd2', nom: 'Hydro-Québec', montant: 78, categorie: 'fixe', jour: 8, cycle: 'cycle1', compte: 'cheques', recurrence: 'mensuel', actif: true },
-    { id: 'd3', nom: 'Internet', montant: 85, categorie: 'fixe', jour: 5, cycle: 'cycle1', compte: 'credit', recurrence: 'mensuel', actif: true },
-    { id: 'd4', nom: 'Cellulaire', montant: 55, categorie: 'fixe', jour: 12, cycle: 'cycle1', compte: 'credit', recurrence: 'mensuel', actif: true },
-    { id: 'd5', nom: 'Gym', montant: 45, categorie: 'variable', jour: 3, cycle: 'cycle1', compte: 'credit', recurrence: 'mensuel', actif: true },
-    { id: 'd6', nom: 'CELIAPP', montant: 400, categorie: 'investissement', jour: 1, cycle: 'cycle1', compte: 'CELIAPP', recurrence: 'mensuel', actif: true },
-    { id: 'd7', nom: 'Épicerie', montant: 260, categorie: 'variable', jour: 15, cycle: 'deux', compte: 'credit', recurrence: 'mensuel', actif: true },
-    { id: 'd8', nom: 'Essence', montant: 120, categorie: 'variable', jour: 18, cycle: 'cycle2', compte: 'credit', recurrence: 'mensuel', actif: true },
-    { id: 'd9', nom: 'Netflix + Spotify', montant: 32, categorie: 'variable', jour: 22, cycle: 'cycle2', compte: 'credit', recurrence: 'mensuel', actif: true },
-    { id: 'd10', nom: 'Assurance auto', montant: 96, categorie: 'fixe', jour: 20, cycle: 'cycle2', compte: 'cheques', recurrence: 'mensuel', actif: true },
-    { id: 'd11', nom: 'Restos & sorties', montant: 180, categorie: 'variable', jour: 24, cycle: 'cycle2', compte: 'credit', recurrence: 'mensuel', actif: true },
-    { id: 'd12', nom: 'CELI', montant: 300, categorie: 'investissement', jour: 15, cycle: 'cycle2', compte: 'CELI', recurrence: 'mensuel', actif: true },
-    { id: 'd13', nom: 'Crypto', montant: 100, categorie: 'investissement', jour: 15, cycle: 'cycle2', compte: 'wealthsimple', recurrence: 'mensuel', actif: true },
-    { id: 'd14', nom: 'Prêt étudiant', montant: 145, categorie: 'dette', jour: 25, cycle: 'cycle2', compte: 'cheques', recurrence: 'mensuel', actif: true },
-  ],
+  coussin: { actuel: 0, objectif: 0, minimum: 0 },
+  depenses: [],
   carte: {
-    limite: 5000,
-    solde: 1740,
+    limite: 0,
+    solde: 0,
     objectif: 30,
-    releve: 21,
-    echeance: 14,
-    autopayJour: 14,
-    autopayMontant: 1740,
+    releve: 1,
+    echeance: 21,
+    autopayJour: 21,
+    autopayMontant: 0,
   },
-  comptes: [
-    { id: 'celiapp', nom: 'CELIAPP', simple: 'Compte pour ma première maison', valeur: 11848, parCycle: 200, annee: 7250, plafondAnnuel: 8000, plafondVie: 40000, utilise: 15400, cash: 0, dansStrategie: true },
-    { id: 'celi', nom: 'CELI', simple: 'Compte à l\u2019abri d\u2019impôt', valeur: 16101, parCycle: 150, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0, cash: 0, dansStrategie: true },
-    { id: 'celi_enfant', nom: 'CELI enfant', simple: 'CELI dédié au portefeuille des enfants', valeur: 0, parCycle: 0, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0, cash: 0, dansStrategie: false },
-    { id: 'crypto', nom: 'Crypto', simple: 'Placements Wealthsimple', valeur: 4301, parCycle: 50, annee: 0, plafondAnnuel: 0, plafondVie: 0, utilise: 0, cash: 0, dansStrategie: false },
-  ],
-  holdings: [
-    { id: 'h_spus_celi', ticker: 'SPUS', compte: 'CELI', actions: 0, prix: 0 },
-    { id: 'h_upro_celi', ticker: 'UPRO', compte: 'CELI', actions: 0, prix: 0 },
-    { id: 'h_xef_celi', ticker: 'XEF', compte: 'CELI', actions: 0, prix: 0 },
-    { id: 'h_xeqt_enfant', ticker: 'XEQT', compte: 'CELI enfant', actions: 0, prix: 0 },
-  ],
-  cibles: [
-    { ticker: 'SPUS', part: 0.40 },
-    { ticker: 'UPRO', part: 0.20 },
-    { ticker: 'XEF', part: 0.40 },
-  ],
+  comptes: [],
+  holdings: [],
+  cibles: [],
   reequilibrage: { tolerance: 5, horizon: 3 },
   rendementAnnuel: 6.5,
   celi: {
@@ -179,6 +177,11 @@ export const DEFAULT_DATA: FinanceData = {
     anneeDebutCotisation: 0,
     cotisations: {},
     plafondVie: 40000,
+  },
+  reer: {
+    revenusAnneesPrecedentes: {},
+    cotisations: {},
+    droitsReport: 0,
   },
   objectif: {
     montant: 1000000,

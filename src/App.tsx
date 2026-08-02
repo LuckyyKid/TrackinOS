@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from './AuthContext';
 import { useFinance } from './FinanceContext';
 import { alertes, aujourdhuiTxt } from './calc';
 import { PageAccueil } from './pages/PageAccueil';
@@ -42,6 +43,7 @@ const TABS: Array<{ id: PageId; num: string; label: string }> = [
 
 export const App = () => {
   const { data, loading, saving } = useFinance();
+  const { user, signOut } = useAuth();
   const [page, setPage] = useState<PageId>('accueil');
   const alertesList = alertes(data);
   const nbAlertes = alertesList.length;
@@ -64,6 +66,12 @@ export const App = () => {
               >
                 {nbAlertes === 1 ? '1 chose à régler' : `${nbAlertes} choses à régler`}
               </button>
+            )}
+            {user && (
+              <div className="header__user">
+                <span>{user.email}</span>
+                <button className="header__signout" onClick={signOut}>Déconnexion</button>
+              </div>
             )}
           </div>
         </div>

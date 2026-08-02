@@ -1,18 +1,28 @@
 import { useMemo, useState } from 'react';
 import { useFinance } from '../FinanceContext';
 import { money, soldesCycles, totalCyclePaye } from '../calc';
-import type { Categorie, CompteSrc, CycleCible, Depense } from '../types';
+import type { Categorie, CompteInvest, CycleCible, Depense } from '../types';
 import { PageHeader } from '../App';
 import { Card, NumInput } from '../ui';
 
-const NOM_COMPTES: Record<CompteSrc, string> = {
+const NOMS_COMPTES_FIXES: Record<string, string> = {
   cheques: 'Compte chèques',
   credit: 'Carte de crédit',
-  CELIAPP: 'CELIAPP',
-  CELI: 'CELI',
-  CELI_ENFANT: 'CELI enfant',
-  wealthsimple: 'Wealthsimple',
 };
+
+const buildNomsComptes = (comptes: CompteInvest[]): Record<string, string> => {
+  const out: Record<string, string> = { ...NOMS_COMPTES_FIXES };
+  comptes.forEach((c) => {
+    out[c.id] = c.nom;
+  });
+  return out;
+};
+
+const buildComptesList = (comptes: CompteInvest[]): string[] => [
+  'cheques',
+  'credit',
+  ...comptes.map((c) => c.id),
+];
 
 const NOM_CAT: Record<Categorie, string> = {
   fixe: 'Facture fixe',
@@ -22,7 +32,6 @@ const NOM_CAT: Record<Categorie, string> = {
   dette: 'Dette',
 };
 
-const COMPTES_LIST: CompteSrc[] = ['cheques', 'credit', 'CELIAPP', 'CELI', 'CELI_ENFANT', 'wealthsimple'];
 const CAT_LIST: Categorie[] = ['fixe', 'variable', 'investissement', 'epargne', 'dette'];
 
 const uid = () => 'd' + Math.random().toString(36).slice(2, 9);
@@ -56,6 +65,8 @@ export const PageDepenses = () => {
   const soldes = soldesCycles(data);
   const total1 = totalCyclePaye(data, 'cycle1');
   const total2 = totalCyclePaye(data, 'cycle2');
+  const nomsComptes = useMemo(() => buildNomsComptes(data.comptes), [data.comptes]);
+  const comptesList = useMemo(() => buildComptesList(data.comptes), [data.comptes]);
 
   const ajouter = (d: Depense) => setData((x) => ({ ...x, depenses: [...x.depenses, d] }));
   const modifier = (id: string, patch: Partial<Depense>) =>
@@ -82,9 +93,19 @@ export const PageDepenses = () => {
       />
 
       {mode === 'assistant' ? (
-        <Assistant onSave={ajouter} labels={[data.cycles[0].label, data.cycles[1].label]} />
+        <Assistant
+          onSave={ajouter}
+          labels={[data.cycles[0].label, data.cycles[1].label]}
+          nomsComptes={nomsComptes}
+          comptesList={comptesList}
+        />
       ) : (
-        <LigneRapide onSave={ajouter} labels={[data.cycles[0].label, data.cycles[1].label]} />
+        <LigneRapide
+          onSave={ajouter}
+          labels={[data.cycles[0].label, data.cycles[1].label]}
+          nomsComptes={nomsComptes}
+          comptesList={comptesList}
+        />
       )}
 
       <div className="row gap-10 mt-24" style={{ flexWrap: 'wrap' }}>
@@ -122,7 +143,7 @@ export const PageDepenses = () => {
         {listeAffichee.map((d) => {
           const cycleLbl =
             d.cycle === 'deux' ? 'les deux paies' : d.cycle === 'cycle1' ? data.cycles[0].label : data.cycles[1].label;
-          const detail = `Le ${d.jour} · ${cycleLbl} · ${NOM_COMPTES[d.compte]}`;
+          const detail = `Le ${d.jour} · ${cycleLbl} · ${nomsComptes[d.compte] ?? d.compte}`;
           const barPct = Math.min(100, (d.montant / Math.max(...data.depenses.map((x) => x.montant))) * 100);
           const barColor =
             d.categorie === 'investissement' ? '#94bce3' : d.categorie === 'dette' ? '#a4402f' : '#5980a6';
@@ -168,9 +189,13 @@ export const PageDepenses = () => {
 const Assistant = ({
   onSave,
   labels,
+  nomsComptes,
+  comptesList,
 }: {
   onSave: (d: Depense) => void;
   labels: [string, string];
+  nomsComptes: Record<string, string>;
+  comptesList: string[];
 }) => {
   const [etape, setEtape] = useState(1);
   const [d, setD] = useState<Depense>(nouvelle);
@@ -196,7 +221,7 @@ const Assistant = ({
 
   const cycleLbl =
     d.cycle === 'cycle1' ? labels[0] : d.cycle === 'cycle2' ? labels[1] : 'les deux paies';
-  const resume = `${d.nom || 'Cette dépense'} — ${money(d.montant)} le ${d.jour}, ${cycleLbl}, ${NOM_COMPTES[d.compte]}, ${NOM_CAT[d.categorie].toLowerCase()}.`;
+  const resume = `${d.nom || 'Cette dépense'} — ${money(d.montant)} le ${d.jour}, ${cycleLbl}, ${nomsComptes[d.compte] ?? d.compte}, ${NOM_CAT[d.categorie].toLowerCase()}.`;
 
   return (
     <Card className="card--info card--pad-sm">
@@ -279,13 +304,13 @@ const Assistant = ({
           <div>
             <div className="blue" style={{ fontSize: 16, marginBottom: 8 }}>D'où sort l'argent ?</div>
             <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
-              {COMPTES_LIST.map((c) => (
+              {comptesList.map((c) => (
                 <button
                   key={c}
                   className={'btn' + (d.compte === c ? ' btn--primary' : '')}
                   onClick={() => set({ compte: c })}
                 >
-                  {NOM_COMPTES[c]}
+                  {nomsComptes[c] ?? c}
                 </button>
               ))}
             </div>
@@ -328,9 +353,13 @@ const Assistant = ({
 const LigneRapide = ({
   onSave,
   labels,
+  nomsComptes,
+  comptesList,
 }: {
   onSave: (d: Depense) => void;
   labels: [string, string];
+  nomsComptes: Record<string, string>;
+  comptesList: string[];
 }) => {
   const [d, setD] = useState<Depense>(nouvelle);
   const set = (patch: Partial<Depense>) => setD({ ...d, ...patch });
@@ -365,9 +394,9 @@ const LigneRapide = ({
         </label>
         <label className="field">
           <span className="field__label">D'où</span>
-          <select className="field__input" value={d.compte} onChange={(e) => set({ compte: e.target.value as CompteSrc })}>
-            {COMPTES_LIST.map((c) => (
-              <option key={c} value={c}>{NOM_COMPTES[c]}</option>
+          <select className="field__input" value={d.compte} onChange={(e) => set({ compte: e.target.value })}>
+            {comptesList.map((c) => (
+              <option key={c} value={c}>{nomsComptes[c] ?? c}</option>
             ))}
           </select>
         </label>

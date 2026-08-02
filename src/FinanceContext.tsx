@@ -8,7 +8,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { DEFAULT_DATA, type FinanceData, type CompteInvest } from './types';
+import { DEFAULT_DATA, type FinanceData } from './types';
+import { supabase } from './supabase';
+import { useAuth } from './AuthContext';
 
 type Ctx = {
   data: FinanceData;
@@ -20,116 +22,112 @@ type Ctx = {
 
 const FinanceContext = createContext<Ctx | null>(null);
 
-const KEY = 'cyclepay.finance.v1';
-
-const uid = (): string =>
-  'h_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
-
-const merge = (loaded: Partial<FinanceData>): FinanceData => {
-  const rawHoldings = (loaded.holdings ?? DEFAULT_DATA.holdings) as Array<
-    FinanceData['holdings'][number] & { cible?: number }
-  >;
-  const holdings = rawHoldings.map((h) => ({
-    id: h.id ?? uid(),
-    ticker: h.ticker,
-    compte: h.compte,
-    actions: h.actions,
-    prix: h.prix,
-  }));
-  let cibles = loaded.cibles;
-  if (!cibles) {
-    const seen = new Map<string, number>();
-    rawHoldings.forEach((h) => {
-      // CELI enfant est un pool séparé (XEQT dédié aux enfants) — hors stratégie perso
-      if (h.compte === 'CELI enfant') return;
-      if (h.ticker && typeof h.cible === 'number' && !seen.has(h.ticker)) {
-        seen.set(h.ticker, h.cible);
-      }
-    });
-    cibles = seen.size
-      ? Array.from(seen, ([ticker, part]) => ({ ticker, part }))
-      : DEFAULT_DATA.cibles;
-  }
-  const rawComptes = (loaded.comptes ?? DEFAULT_DATA.comptes) as Array<
-    Partial<CompteInvest> & Pick<CompteInvest, 'id'>
-  >;
-  const comptes: CompteInvest[] = rawComptes.map((c) => {
-    const defaut = DEFAULT_DATA.comptes.find((d) => d.id === c.id);
-    const base = defaut ?? DEFAULT_DATA.comptes[0];
-    return {
-      ...base,
-      ...c,
-      cash: typeof c.cash === 'number' ? c.cash : 0,
-      dansStrategie:
-        typeof c.dansStrategie === 'boolean' ? c.dansStrategie : defaut?.dansStrategie ?? true,
-    };
-  });
-  return {
-    ...DEFAULT_DATA,
-    ...loaded,
-    celi: { ...DEFAULT_DATA.celi, ...(loaded.celi ?? {}) },
-    celiapp: { ...DEFAULT_DATA.celiapp, ...(loaded.celiapp ?? {}) },
-    objectif: { ...DEFAULT_DATA.objectif, ...(loaded.objectif ?? {}) },
-    reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
-    coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },
-    carte: { ...DEFAULT_DATA.carte, ...(loaded.carte ?? {}) },
-    comptes,
-    holdings,
-    cibles,
-  };
-};
-
-const chargerInitial = (): FinanceData => {
-  try {
-    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
-    if (!raw) return DEFAULT_DATA;
-    return merge(JSON.parse(raw));
-  } catch {
-    return DEFAULT_DATA;
-  }
-};
+const merge = (loaded: Partial<FinanceData>): FinanceData => ({
+  ...DEFAULT_DATA,
+  ...loaded,
+  celi: { ...DEFAULT_DATA.celi, ...(loaded.celi ?? {}) },
+  celiapp: { ...DEFAULT_DATA.celiapp, ...(loaded.celiapp ?? {}) },
+  reer: { ...DEFAULT_DATA.reer, ...(loaded.reer ?? {}) },
+  objectif: { ...DEFAULT_DATA.objectif, ...(loaded.objectif ?? {}) },
+  reequilibrage: { ...DEFAULT_DATA.reequilibrage, ...(loaded.reequilibrage ?? {}) },
+  coussin: { ...DEFAULT_DATA.coussin, ...(loaded.coussin ?? {}) },
+  carte: { ...DEFAULT_DATA.carte, ...(loaded.carte ?? {}) },
+  comptes: loaded.comptes ?? DEFAULT_DATA.comptes,
+  holdings: loaded.holdings ?? DEFAULT_DATA.holdings,
+  cibles: loaded.cibles ?? DEFAULT_DATA.cibles,
+});
 
 export const FinanceDataProvider = ({ children }: { children: ReactNode }) => {
-  const [data, setDataState] = useState<FinanceData>(chargerInitial);
+  const { user } = useAuth();
+  const [data, setDataState] = useState<FinanceData>(DEFAULT_DATA);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const timer = useRef<number | null>(null);
-  const firstLoad = useRef(true);
+  const skipNextSave = useRef(true);
+  const currentUserId = useRef<string | null>(null);
 
+  // Chargement initial depuis Supabase à chaque changement d'utilisateur
   useEffect(() => {
-    if (firstLoad.current) {
-      firstLoad.current = false;
+    if (!user) return;
+    let cancelled = false;
+    setLoading(true);
+    skipNextSave.current = true;
+    currentUserId.current = user.id;
+
+    (async () => {
+      const { data: row, error } = await supabase
+        .from('finance_data')
+        .select('data')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('Erreur chargement finance_data', error);
+        setDataState(DEFAULT_DATA);
+        setLoading(false);
+        return;
+      }
+
+      if (row?.data) {
+        setDataState(merge(row.data as Partial<FinanceData>));
+      } else {
+        // Première connexion : créer une ligne vide
+        setDataState(DEFAULT_DATA);
+        await supabase
+          .from('finance_data')
+          .insert({ user_id: user.id, data: DEFAULT_DATA });
+      }
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Sauvegarde debounced à chaque modification
+  useEffect(() => {
+    if (!user || loading) return;
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
       return;
     }
+    if (currentUserId.current !== user.id) return;
+
     if (timer.current) window.clearTimeout(timer.current);
     setSaving(true);
-    timer.current = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(KEY, JSON.stringify(data));
-      } catch {
-        // stockage plein ou bloqué — on abandonne silencieusement
-      }
+    timer.current = window.setTimeout(async () => {
+      const { error } = await supabase
+        .from('finance_data')
+        .upsert({ user_id: user.id, data, updated_at: new Date().toISOString() });
+      if (error) console.error('Erreur sauvegarde finance_data', error);
       setSaving(false);
-    }, 300);
+    }, 500);
+
     return () => {
       if (timer.current) window.clearTimeout(timer.current);
     };
-  }, [data]);
+  }, [data, user, loading]);
 
   const setData = useCallback(
     (updater: (d: FinanceData) => FinanceData) => setDataState((d) => updater(d)),
     [],
   );
 
-  const reset = useCallback(() => {
-    try {
-      window.localStorage.removeItem(KEY);
-    } catch {}
+  const reset = useCallback(async () => {
     setDataState(DEFAULT_DATA);
-  }, []);
+    if (user) {
+      await supabase
+        .from('finance_data')
+        .upsert({ user_id: user.id, data: DEFAULT_DATA, updated_at: new Date().toISOString() });
+    }
+  }, [user]);
 
   const value = useMemo(
-    () => ({ data, setData, loading: false, saving, reset }),
-    [data, setData, saving, reset],
+    () => ({ data, setData, loading, saving, reset }),
+    [data, setData, loading, saving, reset],
   );
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
 };

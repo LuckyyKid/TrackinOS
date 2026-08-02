@@ -403,3 +403,130 @@ input[type="range"] {
   .header__inner { padding: 12px 14px; }
   .nav { padding: 0 14px 10px; }
 }
+
+/* --- Auth (login / signup) --- */
+.auth-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f5f4f0;
+}
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border: 1px solid #e7e7ea;
+  padding: 32px 28px;
+}
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e7e7ea;
+}
+.auth-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.auth-tab--active {
+  color: #111;
+  border-bottom-color: #a4402f;
+  font-weight: 600;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #444;
+}
+.auth-label input {
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  font-family: inherit;
+  background: #fff;
+}
+.auth-label input:focus {
+  outline: none;
+  border-color: #5980a6;
+}
+.auth-error {
+  background: #fbe9e6;
+  border-left: 3px solid #a4402f;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #7a2c22;
+}
+.auth-info {
+  background: #eaf1f8;
+  border-left: 3px solid #5980a6;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #2b4a68;
+}
+.auth-submit {
+  margin-top: 8px;
+  padding: 12px;
+  background: #111;
+  color: #fff;
+  border: none;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.auth-foot {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+}
+.auth-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #a4402f;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+}
+.header__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #555;
+}
+.header__signout {
+  background: none;
+  border: 1px solid #ccc;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  color: #444;
+}
+.header__signout:hover {
+  border-color: #a4402f;
+  color: #a4402f;
+}

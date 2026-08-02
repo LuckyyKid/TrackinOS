@@ -1,5 +1,14 @@
-import type { Carte, Cycle, CycleId, Depense, FinanceData, Holding } from './types';
-import { CELI_PLAFONDS_OFFICIELS } from './types';
+import type {
+  Carte,
+  CompteInvest,
+  Cycle,
+  CycleId,
+  Depense,
+  FinanceData,
+  Holding,
+  TypeCompte,
+} from './types';
+import { CELI_PLAFONDS_OFFICIELS, REER_PLAFONDS_MAX } from './types';
 
 export const money = (n: number): string => {
   const sign = n < 0 ? '\u2212 ' : '';
@@ -38,14 +47,15 @@ export const revenuMensuel = (data: FinanceData): number =>
 export const totalParCategorie = (data: FinanceData, cat: Depense['categorie']): number =>
   data.depenses.filter((d) => d.actif && d.categorie === cat).reduce((s, d) => s + d.montant, 0);
 
-export const totalSurCompte = (data: FinanceData, compte: Depense['compte']): number =>
+export const totalSurCompte = (data: FinanceData, compte: string): number =>
   data.depenses.filter((d) => d.actif && d.compte === compte).reduce((s, d) => s + d.montant, 0);
 
-export const utilisationCarte = (carte: Carte): number => carte.solde / carte.limite;
+export const utilisationCarte = (carte: Carte): number =>
+  carte.limite > 0 ? carte.solde / carte.limite : 0;
 
 export const utilisationCarteProjetee = (data: FinanceData): number => {
   const surCarte = totalSurCompte(data, 'credit');
-  return (data.carte.solde + surCarte) / data.carte.limite;
+  return data.carte.limite > 0 ? (data.carte.solde + surCarte) / data.carte.limite : 0;
 };
 
 export const paiementPour30 = (carte: Carte): number =>
@@ -65,7 +75,7 @@ export const projection = (
 ): ProjectionPoint[] => {
   const rMois = rendementMensuel(data.rendementAnnuel);
   const contribMensuelle = data.comptes.reduce((s, c) => s + c.parCycle * 2, 0);
-  const depart = valeurDepart ?? data.comptes.reduce((s, c) => s + c.valeur, 0);
+  const depart = valeurDepart ?? data.comptes.reduce((s, c) => s + valeurCompte(data, c.id), 0);
   const points: ProjectionPoint[] = [{ annee: 0, valeur: depart, investi: depart }];
   let valeur = depart;
   let investi = depart;
@@ -155,16 +165,14 @@ export type EtatObjectif =
       contribMensuelle: number;
       rMois: number;
       rendementAnnuel: number;
-      // rythme actuel
-      valeurALAgeCible: number; // valeur projetée à l'âge cible au rythme actuel
-      moisPourAtteindre: number | null; // mois nécessaires pour atteindre l'objectif au rythme actuel
-      ageAtteinte: number | null; // âge à ce moment
+      valeurALAgeCible: number;
+      moisPourAtteindre: number | null;
+      ageAtteinte: number | null;
       anneeAtteinte: number | null;
-      // ajustements pour atteindre l'objectif à l'âge cible
-      manquePourAgeCible: number; // objectif - valeur à l'âge cible (>0 s'il manque)
-      contribSupplementaire: number | null; // $ / mois de plus à ajouter (null si non nécessaire)
+      manquePourAgeCible: number;
+      contribSupplementaire: number | null;
       contribTotaleRequise: number | null;
-      rendementAnnuelRequis: number | null; // % (null si impossible ou déjà atteint)
+      rendementAnnuelRequis: number | null;
     };
 
 export const etatObjectif = (data: FinanceData, today = new Date()): EtatObjectif => {
@@ -182,18 +190,17 @@ export const etatObjectif = (data: FinanceData, today = new Date()): EtatObjecti
 
   const rMois = rendementMensuel(data.rendementAnnuel);
   const contribMensuelle = data.comptes.reduce((s, c) => s + c.parCycle * 2, 0);
-  const valeurActuelle = data.comptes.reduce((s, c) => s + c.valeur, 0);
+  const valeurActuelle = data.comptes.reduce((s, c) => s + valeurCompte(data, c.id), 0);
   const objectif = data.objectif.montant;
 
   const valeurALAgeCible = valeurFuture(valeurActuelle, contribMensuelle, rMois, mois);
 
-  // Combien de mois pour atteindre l'objectif au rythme actuel ?
   let moisPourAtteindre: number | null = null;
   if (valeurActuelle >= objectif) {
     moisPourAtteindre = 0;
   } else {
     let v = valeurActuelle;
-    const maxMois = 12 * 100; // 100 ans
+    const maxMois = 12 * 100;
     for (let m = 1; m <= maxMois; m++) {
       v = v * (1 + rMois) + contribMensuelle;
       if (v >= objectif) {
@@ -213,7 +220,6 @@ export const etatObjectif = (data: FinanceData, today = new Date()): EtatObjecti
 
   const manquePourAgeCible = Math.max(0, objectif - valeurALAgeCible);
 
-  // Contribution mensuelle requise pour atteindre l'objectif à l'âge cible
   let contribTotaleRequise: number | null = null;
   let contribSupplementaire: number | null = null;
   if (manquePourAgeCible > 0) {
@@ -223,11 +229,10 @@ export const etatObjectif = (data: FinanceData, today = new Date()): EtatObjecti
     contribSupplementaire = Math.max(0, contribTotaleRequise - contribMensuelle);
   }
 
-  // Rendement annuel requis pour atteindre l'objectif à l'âge cible avec la contribution actuelle
   let rendementAnnuelRequis: number | null = null;
   if (manquePourAgeCible > 0) {
     let lo = 0;
-    let hi = 1; // 100 % par mois (extrême)
+    let hi = 1;
     for (let i = 0; i < 80; i++) {
       const mid = (lo + hi) / 2;
       const vf = valeurFuture(valeurActuelle, contribMensuelle, mid, mois);
@@ -260,31 +265,31 @@ export const etatObjectif = (data: FinanceData, today = new Date()): EtatObjecti
   };
 };
 
+// ---------- Portefeuille ----------
+
 export type PortefeuillePos = {
   ticker: string;
   lignes: Holding[];
   valeur: number;
   poids: number;
   cible: number; // 0..1
-  derive: number; // poids - cible
-  besoin: number; // avant prorata
-  achat: number; // après prorata
+  derive: number;
+  besoin: number;
+  achat: number;
   aCorriger: boolean;
 };
 
 export const analysePortefeuille = (data: FinanceData): {
   positions: PortefeuillePos[];
-  total: number; // holdings perso + cash perso
-  totalHoldings: number; // valeur des holdings perso seulement
-  cash: number; // cash des comptes en stratégie
+  total: number;
+  totalHoldings: number;
+  cash: number;
   prochaineContribution: number;
-  aDistribuer: number; // cash + prochaine contribution
+  aDistribuer: number;
 } => {
   const comptesStrategie = data.comptes.filter((c) => c.dansStrategie);
-  const labelsPerso = new Set(
-    comptesStrategie.map((c) => LABEL_HOLDING[c.id]).filter(Boolean),
-  );
-  const holdingsPerso = data.holdings.filter((h) => labelsPerso.has(h.compte));
+  const idsPerso = new Set(comptesStrategie.map((c) => c.id));
+  const holdingsPerso = data.holdings.filter((h) => idsPerso.has(h.compte));
   const cash = comptesStrategie.reduce((s, c) => s + (c.cash || 0), 0);
   const prochaineContribution = comptesStrategie.reduce((s, c) => s + c.parCycle, 0);
   const aDistribuer = cash + prochaineContribution;
@@ -343,15 +348,36 @@ export const analysePortefeuille = (data: FinanceData): {
   return { positions, total, totalHoldings, cash, prochaineContribution, aDistribuer };
 };
 
-// ---------- CELI (plafond partagé selon date de naissance + historique) ----------
+// ---------- Helpers comptes ----------
+
+export const comptesParType = (data: FinanceData, type: TypeCompte): CompteInvest[] =>
+  data.comptes.filter((c) => c.typeCompte === type);
+
+export const aUnCompteType = (data: FinanceData, type: TypeCompte): boolean =>
+  comptesParType(data, type).length > 0;
+
+export const valeurCompte = (data: FinanceData, compteId: string): number => {
+  const compte = data.comptes.find((c) => c.id === compteId);
+  if (!compte) return 0;
+  const desHoldings = data.holdings.filter((h) => h.compte === compteId);
+  if (desHoldings.length > 0) {
+    const invest = desHoldings.reduce((s, h) => s + h.actions * h.prix, 0);
+    return invest + (compte.cash ?? 0);
+  }
+  return compte.valeur ?? 0;
+};
+
+export const valeurTypeCompte = (data: FinanceData, type: TypeCompte): number =>
+  comptesParType(data, type).reduce((s, c) => s + valeurCompte(data, c.id), 0);
+
+// ---------- CELI ----------
 
 export const celiAnneeEligible = (naissance: string, today = new Date()): number => {
-  const anneeMin = 2009; // création du CELI
+  const anneeMin = 2009;
   if (!naissance) return anneeMin;
   const parts = naissance.split('-');
   const y = Number(parts[0]);
   if (!y) return anneeMin;
-  // droit à cotiser dès l'année où on a 18 ans
   return Math.max(anneeMin, y + 18);
 };
 
@@ -384,29 +410,9 @@ export const celiDisponible = (data: FinanceData, today = new Date()): number =>
 export const celiCotiseCetteAnnee = (data: FinanceData, today = new Date()): number =>
   data.celi.cotisations?.[today.getFullYear()] ?? 0;
 
-// Mappe l'id d'un compte vers le libellé « compte » utilisé dans les holdings
-export const LABEL_HOLDING: Record<string, string> = {
-  celiapp: 'CELIAPP',
-  celi: 'CELI',
-  celi_enfant: 'CELI enfant',
-  crypto: 'Wealthsimple',
-};
+export const celiValeurTotale = (data: FinanceData): number => valeurTypeCompte(data, 'CELI');
 
-export const valeurCompte = (data: FinanceData, compteId: string): number => {
-  const label = LABEL_HOLDING[compteId];
-  const compte = data.comptes.find((c) => c.id === compteId);
-  const desHoldings = data.holdings.filter((h) => h.compte === label);
-  if (desHoldings.length > 0) {
-    const invest = desHoldings.reduce((s, h) => s + h.actions * h.prix, 0);
-    return invest + (compte?.cash ?? 0);
-  }
-  return compte?.valeur ?? 0;
-};
-
-export const celiValeurTotale = (data: FinanceData): number =>
-  valeurCompte(data, 'celi') + valeurCompte(data, 'celi_enfant');
-
-// ---------- CELIAPP (plafond à vie seulement, historique de cotisations) ----------
+// ---------- CELIAPP ----------
 
 export const celiappCotisationsCumulees = (data: FinanceData, today = new Date()): number => {
   const anneeCourante = today.getFullYear();
@@ -423,7 +429,51 @@ export const celiappCotiseCetteAnnee = (data: FinanceData, today = new Date()): 
 export const celiappDisponible = (data: FinanceData, today = new Date()): number =>
   (data.celiapp?.plafondVie ?? 40000) - celiappCotisationsCumulees(data, today);
 
-export const celiappValeurTotale = (data: FinanceData): number => valeurCompte(data, 'celiapp');
+export const celiappValeurTotale = (data: FinanceData): number => valeurTypeCompte(data, 'CELIAPP');
+
+// ---------- REER ----------
+
+export const reerPlafondMaxAnnuel = (annee: number): number => REER_PLAFONDS_MAX[annee] ?? 0;
+
+// Plafond de l'année N = min(18% du revenu gagné en N-1, max CRA de N)
+export const reerPlafondAnnuel = (data: FinanceData, annee: number): number => {
+  const revenuAnneePrec = data.reer?.revenusAnneesPrecedentes?.[annee - 1] ?? 0;
+  const max = reerPlafondMaxAnnuel(annee);
+  const dix8 = revenuAnneePrec * 0.18;
+  if (max <= 0 && dix8 <= 0) return 0;
+  if (max <= 0) return dix8;
+  return Math.min(dix8, max);
+};
+
+// Droits cumulés = report initial + somme des plafonds annuels de la 1re année cotisée jusqu'à aujourd'hui
+export const reerDroitsCumules = (data: FinanceData, today = new Date()): number => {
+  const anneeCourante = today.getFullYear();
+  const anneesAvecRevenu = Object.keys(data.reer?.revenusAnneesPrecedentes ?? {})
+    .map(Number)
+    .filter((y) => !Number.isNaN(y));
+  if (anneesAvecRevenu.length === 0) return data.reer?.droitsReport ?? 0;
+  const debut = Math.min(...anneesAvecRevenu) + 1;
+  let s = data.reer?.droitsReport ?? 0;
+  for (let y = debut; y <= anneeCourante; y++) s += reerPlafondAnnuel(data, y);
+  return s;
+};
+
+export const reerCotisationsCumulees = (data: FinanceData, today = new Date()): number => {
+  const anneeCourante = today.getFullYear();
+  let s = 0;
+  for (const [k, v] of Object.entries(data.reer?.cotisations ?? {})) {
+    if (Number(k) <= anneeCourante) s += v || 0;
+  }
+  return s;
+};
+
+export const reerDisponible = (data: FinanceData, today = new Date()): number =>
+  reerDroitsCumules(data, today) - reerCotisationsCumulees(data, today);
+
+export const reerCotiseCetteAnnee = (data: FinanceData, today = new Date()): number =>
+  data.reer?.cotisations?.[today.getFullYear()] ?? 0;
+
+export const reerValeurTotale = (data: FinanceData): number => valeurTypeCompte(data, 'REER');
 
 // ---------- Avoir total ----------
 
@@ -435,22 +485,28 @@ export type PartAvoir = {
   couleur: string;
 };
 
-const COULEURS_AVOIR: Record<string, string> = {
-  celiapp: '#1d2d3d',
-  celi: '#416180',
-  celi_enfant: '#5980a6',
-  crypto: '#94bce3',
-  coussin: '#d6ebff',
-};
+const PALETTE_AVOIR = ['#1d2d3d', '#416180', '#5980a6', '#94bce3', '#d6ebff', '#7ba3c9', '#2c4d6b', '#a8c5e0'];
 
 export const avoirTotal = (data: FinanceData): { total: number; parts: PartAvoir[] } => {
   const parts: PartAvoir[] = [];
-  data.comptes.forEach((c) => {
+  data.comptes.forEach((c, i) => {
     const v = valeurCompte(data, c.id);
-    if (v > 0) parts.push({ cle: c.id, nom: c.nom, valeur: v, poids: 0, couleur: COULEURS_AVOIR[c.id] ?? '#5980a6' });
+    if (v > 0) parts.push({
+      cle: c.id,
+      nom: c.nom,
+      valeur: v,
+      poids: 0,
+      couleur: PALETTE_AVOIR[i % PALETTE_AVOIR.length],
+    });
   });
   if (data.coussin.actuel > 0) {
-    parts.push({ cle: 'coussin', nom: 'Fond d\u2019urgence', valeur: data.coussin.actuel, poids: 0, couleur: COULEURS_AVOIR.coussin });
+    parts.push({
+      cle: 'coussin',
+      nom: 'Fond d\u2019urgence',
+      valeur: data.coussin.actuel,
+      poids: 0,
+      couleur: '#d6ebff',
+    });
   }
   const total = parts.reduce((s, p) => s + p.valeur, 0);
   parts.forEach((p) => (p.poids = total > 0 ? p.valeur / total : 0));
@@ -458,28 +514,33 @@ export const avoirTotal = (data: FinanceData): { total: number; parts: PartAvoir
   return { total, parts };
 };
 
+// ---------- Alertes ----------
+
 export type Alerte = {
   id: string;
   titre: string;
   detail: string;
-  cible: string; // page id
+  cible: string;
 };
 
 export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
   const out: Alerte[] = [];
-  const u = utilisationCarte(data.carte);
-  if (u > 0.30) {
-    const paye = paiementPour30(data.carte);
-    const dateEcheance = prochainJour(data.carte.echeance, today);
-    out.push({
-      id: 'carte-30',
-      titre: 'Ta carte de crédit est trop chargée',
-      detail: `Tu utilises ${(u * 100).toFixed(1)} % de ta limite. Paye ${money(paye)} avant le ${dateEcheance} pour revenir sous 30 %.`,
-      cible: 'carte',
-    });
+  if (data.carte.limite > 0) {
+    const u = utilisationCarte(data.carte);
+    if (u > 0.30) {
+      const paye = paiementPour30(data.carte);
+      const dateEcheance = prochainJour(data.carte.echeance, today);
+      out.push({
+        id: 'carte-30',
+        titre: 'Ta carte de crédit est trop chargée',
+        detail: `Tu utilises ${(u * 100).toFixed(1)} % de ta limite. Paye ${money(paye)} avant le ${dateEcheance} pour revenir sous 30 %.`,
+        cible: 'carte',
+      });
+    }
   }
   const s = soldesCycles(data);
   data.cycles.forEach((c, i) => {
+    if (c.montant <= 0) return;
     const solde = i === 0 ? s.cycle1 : s.cycle2;
     if (solde < 0) {
       out.push({
@@ -490,38 +551,18 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
       });
     }
   });
-  const proj = projectionCoussin(data);
-  if (proj < data.coussin.minimum) {
-    out.push({
-      id: 'coussin-min',
-      titre: 'Ton coussin va tomber trop bas',
-      detail: `Après tes deux paies, ton coussin projeté est ${money(proj)}, sous ton minimum de ${money(data.coussin.minimum)}.`,
-      cible: 'coussin',
-    });
-  }
-  data.comptes.forEach((c) => {
-    if (c.id === 'celi' || c.id === 'celi_enfant' || c.id === 'celiapp') return; // gérés à part
-    if (c.plafondAnnuel > 0) {
-      const restant = c.plafondAnnuel - c.annee;
-      if (restant < 1000 && restant >= 0) {
-        out.push({
-          id: `plafond-${c.id}-annuel`,
-          titre: `${c.nom} : bientôt au plafond de l\u2019année`,
-          detail: `Il te reste ${money(restant)} avant le plafond annuel. Dépasser coûte 1 % par mois.`,
-          cible: 'plafonds',
-        });
-      }
-      if (c.utilise > c.plafondVie) {
-        out.push({
-          id: `plafond-${c.id}-vie`,
-          titre: `${c.nom} : plafond à vie dépassé`,
-          detail: `Tu as dépassé le maximum à vie de ${money(c.plafondVie)}. Le gouvernement charge 1 % par mois sur le trop-plein.`,
-          cible: 'plafonds',
-        });
-      }
+  if (data.coussin.objectif > 0 || data.coussin.minimum > 0) {
+    const proj = projectionCoussin(data);
+    if (proj < data.coussin.minimum) {
+      out.push({
+        id: 'coussin-min',
+        titre: 'Ton coussin va tomber trop bas',
+        detail: `Après tes deux paies, ton coussin projeté est ${money(proj)}, sous ton minimum de ${money(data.coussin.minimum)}.`,
+        cible: 'coussin',
+      });
     }
-  });
-  {
+  }
+  if (aUnCompteType(data, 'CELIAPP')) {
     const dispoApp = celiappDisponible(data, today);
     const plafondApp = data.celiapp?.plafondVie ?? 40000;
     if (dispoApp < 0) {
@@ -531,7 +572,7 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
         detail: `Tu as cotisé ${money(-dispoApp)} de trop sur le plafond à vie de ${money(plafondApp)}. Pénalité de 1 % par mois sur le trop-plein.`,
         cible: 'plafonds',
       });
-    } else if (dispoApp < 1000) {
+    } else if (dispoApp < 1000 && dispoApp >= 0) {
       out.push({
         id: 'celiapp-presque',
         titre: 'CELIAPP : bientôt plein',
@@ -540,7 +581,7 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
       });
     }
   }
-  if (data.celi.naissance) {
+  if (aUnCompteType(data, 'CELI') && data.celi.naissance) {
     const dispo = celiDisponible(data, today);
     if (dispo < 0) {
       out.push({
@@ -553,7 +594,25 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
       out.push({
         id: 'celi-presque',
         titre: 'CELI : bientôt plein',
-        detail: `Il te reste ${money(dispo)} de droits CELI (partagés entre tes deux comptes).`,
+        detail: `Il te reste ${money(dispo)} de droits CELI (partagés entre tous tes comptes CELI).`,
+        cible: 'plafonds',
+      });
+    }
+  }
+  if (aUnCompteType(data, 'REER')) {
+    const dispoReer = reerDisponible(data, today);
+    if (dispoReer < 0) {
+      out.push({
+        id: 'reer-depasse',
+        titre: 'REER : plafond dépassé',
+        detail: `Tu as cotisé ${money(-dispoReer)} de trop dans tes REER. Pénalité de 1 % par mois au-delà de 2 000 $ de trop-plein.`,
+        cible: 'plafonds',
+      });
+    } else if (dispoReer < 1000 && dispoReer > 0) {
+      out.push({
+        id: 'reer-presque',
+        titre: 'REER : bientôt plein',
+        detail: `Il te reste ${money(dispoReer)} de droits REER.`,
         cible: 'plafonds',
       });
     }
@@ -561,15 +620,11 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
   return out;
 };
 
-// helper for alert copy
 export const prochainJour = (jour: number, today = new Date()): string => {
   const y = today.getFullYear();
   const m = today.getMonth();
   const j = today.getDate();
-  const date =
-    jour >= j
-      ? new Date(y, m, jour)
-      : new Date(y, m + 1, jour);
+  const date = jour >= j ? new Date(y, m, jour) : new Date(y, m + 1, jour);
   return date.toLocaleDateString('fr-CA', { day: 'numeric', month: 'long' });
 };
 
