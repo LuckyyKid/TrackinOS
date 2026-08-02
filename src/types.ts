@@ -102,6 +102,10 @@ export type CeliappConfig = {
   plafondVie: number; // 40 000 $ par défaut
 };
 
+// CELIAPP : plafond annuel de base + report d'une année (max 8 000 $ reportables à la fois → max 16 000 $ dans une seule année).
+export const CELIAPP_PLAFOND_ANNUEL_BASE = 8000;
+export const CELIAPP_CARRYOVER_MAX = 8000;
+
 // REER : le plafond de l'année N vient de 18% du revenu gagné en N-1, plafonné au max CRA de N.
 // L'utilisateur saisit ses revenus par année ; on calcule les droits.
 export type ReerConfig = {

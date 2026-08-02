@@ -12,6 +12,8 @@ import {
   celiappCotisationsCumulees,
   celiappCotiseCetteAnnee,
   celiappDisponible,
+  celiappDisponibleAnnee,
+  celiappPlafondAnnuel,
   celiappValeurTotale,
   comptesParType,
   money,
@@ -141,6 +143,10 @@ export const PagePlafonds = () => {
   const enTropApp = dispoApp < 0;
   const procheApp = dispoApp >= 0 && dispoApp < 1000;
   const couleurApp = enTropApp || procheApp ? '#a4402f' : '#416180';
+  const plafondAppAnnee = celiappPlafondAnnuel(data, anneeCourante);
+  const dispoAppAnnee = celiappDisponibleAnnee(data, today);
+  const barAppAnnee = plafondAppAnnee > 0 ? Math.min(1, cotiseAppAnnee / plafondAppAnnee) : 0;
+  const enTropAppAnnee = data.celiapp?.anneeDebutCotisation ? cotiseAppAnnee > plafondAppAnnee : false;
 
   // ---------- REER ----------
   const revenusReerAnnees = useMemo(() => {
@@ -368,7 +374,7 @@ export const PagePlafonds = () => {
               <div className="muted" style={{ fontSize: 15 }}>Cotisé cette année</div>
               <div className="mono-cond" style={{ fontSize: 30 }}>{money(cotiseAppAnnee)}</div>
               <div className="subtle" style={{ fontSize: 14 }}>
-                Ne compte que pour le plafond à vie.
+                Compte à la fois pour le plafond annuel et le plafond à vie.
               </div>
             </div>
           </div>
@@ -389,6 +395,31 @@ export const PagePlafonds = () => {
             </div>
           </div>
 
+          {data.celiapp?.anneeDebutCotisation ? (
+            <div className="mt-24">
+              <div className="row between" style={{ fontSize: 17 }}>
+                <span>Cette année ({anneeCourante})</span>
+                <span>{money(cotiseAppAnnee)} sur {money(plafondAppAnnee)}</span>
+              </div>
+              <div className="mt-8">
+                <Bar value={barAppAnnee} color={enTropAppAnnee ? '#a4402f' : '#5980a6'} height={26} />
+              </div>
+              <div className="mt-8" style={{ fontSize: 15, color: '#424244' }}>
+                Plafond annuel de base : <strong>8 000 $</strong>. Report d'un maximum de <strong>8 000 $</strong> inutilisés de l'année précédente (donc jusqu'à 16 000 $ dans une seule année).
+                {enTropAppAnnee && (
+                  <>
+                    {' '}<span style={{ color: '#a4402f', fontWeight: 700 }}>
+                      Tu dépasses de {money(cotiseAppAnnee - plafondAppAnnee)} cette année.
+                    </span>
+                  </>
+                )}
+                {!enTropAppAnnee && dispoAppAnnee >= 0 && (
+                  <> Il te reste <strong>{money(dispoAppAnnee)}</strong> à cotiser en {anneeCourante}.</>
+                )}
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-24">
             <div className="section-label">Ce que j'ai cotisé chaque année</div>
             {anneesCotisationApp.length === 0 ? (
@@ -399,7 +430,9 @@ export const PagePlafonds = () => {
               <div className="grid grid-auto-190 gap-14 mt-14">
                 {anneesCotisationApp.map((y) => (
                   <label key={y} className="field">
-                    <span className="field__label">{y}</span>
+                    <span className="field__label">
+                      {y} · plafond {money(celiappPlafondAnnuel(data, y))}
+                    </span>
                     <NumInput
                       className="field__input"
                       style={{ fontSize: 22 }}
@@ -413,6 +446,9 @@ export const PagePlafonds = () => {
                 ))}
               </div>
             )}
+            <div className="subtle mt-8" style={{ fontSize: 13 }}>
+              Le plafond de chaque année tient compte du report de l'année précédente (max 8 000 $ reportables à la fois).
+            </div>
           </div>
         </Card>
       )}

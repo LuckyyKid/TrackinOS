@@ -10,6 +10,8 @@ import type {
   TypeCompte,
 } from './types';
 import {
+  CELIAPP_CARRYOVER_MAX,
+  CELIAPP_PLAFOND_ANNUEL_BASE,
   CELI_PLAFONDS_OFFICIELS,
   REEE_COMPTE_DEFAULT,
   REEE_IQEE_ANNUELLE_MAX,
@@ -441,6 +443,28 @@ export const celiappCotiseCetteAnnee = (data: FinanceData, today = new Date()): 
 export const celiappDisponible = (data: FinanceData, today = new Date()): number =>
   (data.celiapp?.plafondVie ?? 40000) - celiappCotisationsCumulees(data, today);
 
+// Plafond CELIAPP pour l'année N : base 8 000 $ + report d'un maximum de 8 000 $ inutilisés de l'année N-1.
+// Le report ne s'accumule pas au-delà d'un an ; l'année d'ouverture donne 8 000 $ pile.
+export const celiappPlafondAnnuel = (data: FinanceData, annee: number): number => {
+  const debut = data.celiapp?.anneeDebutCotisation || 0;
+  if (!debut || annee < debut) return 0;
+  if (annee === debut) return CELIAPP_PLAFOND_ANNUEL_BASE;
+  const plafondPrec = celiappPlafondAnnuel(data, annee - 1);
+  const cotisePrec = data.celiapp?.cotisations?.[annee - 1] ?? 0;
+  const reportBrut = Math.max(0, plafondPrec - cotisePrec);
+  const report = Math.min(CELIAPP_CARRYOVER_MAX, reportBrut);
+  return CELIAPP_PLAFOND_ANNUEL_BASE + report;
+};
+
+// Disponible cette année = plafond annuel - cotisé cette année, mais aussi borné par le disponible à vie.
+export const celiappDisponibleAnnee = (data: FinanceData, today = new Date()): number => {
+  const annee = today.getFullYear();
+  const plafondAn = celiappPlafondAnnuel(data, annee);
+  const cotiseAn = celiappCotiseCetteAnnee(data, today);
+  const dispoVie = celiappDisponible(data, today);
+  return Math.min(plafondAn - cotiseAn, dispoVie);
+};
+
 export const celiappValeurTotale = (data: FinanceData): number => valeurTypeCompte(data, 'CELIAPP');
 
 // ---------- REER ----------
@@ -704,6 +728,19 @@ export const alertes = (data: FinanceData, today = new Date()): Alerte[] => {
         detail: `Il te reste ${money(dispoApp)} de droits sur le plafond à vie.`,
         cible: 'plafonds',
       });
+    }
+    if (data.celiapp?.anneeDebutCotisation) {
+      const plafondAn = celiappPlafondAnnuel(data, today.getFullYear());
+      const cotiseAn = celiappCotiseCetteAnnee(data, today);
+      const surplus = cotiseAn - plafondAn;
+      if (surplus > 0) {
+        out.push({
+          id: 'celiapp-annuel-depasse',
+          titre: `CELIAPP : plafond ${today.getFullYear()} dépassé`,
+          detail: `Tu as cotisé ${money(surplus)} de trop cette année (plafond annuel ${money(plafondAn)}). Pénalité de 1 % par mois sur le trop-plein.`,
+          cible: 'plafonds',
+        });
+      }
     }
   }
   if (aUnCompteType(data, 'CELI') && data.celi.naissance) {
