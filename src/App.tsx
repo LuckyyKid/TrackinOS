@@ -42,7 +42,7 @@ const TABS: Array<{ id: PageId; num: string; label: string }> = [
 ];
 
 export const App = () => {
-  const { data, loading, saving } = useFinance();
+  const { data, loading, saving, error } = useFinance();
   const { user, signOut } = useAuth();
   const [page, setPage] = useState<PageId>('accueil');
   const alertesList = alertes(data);
@@ -90,6 +90,21 @@ export const App = () => {
         </nav>
       </header>
       <main className="main">
+        {error && (
+          <div
+            style={{
+              background: '#fdecea',
+              border: '1px solid #a4402f',
+              color: '#a4402f',
+              padding: 14,
+              marginBottom: 18,
+              fontSize: 15,
+              fontWeight: 600,
+            }}
+          >
+            ⚠ {error}
+          </div>
+        )}
         {loading ? (
           <div className="section-label">Chargement…</div>
         ) : (

@@ -17,6 +17,7 @@ type Ctx = {
   setData: (updater: (d: FinanceData) => FinanceData) => void;
   loading: boolean;
   saving: boolean;
+  error: string | null;
   reset: () => void;
 };
 
@@ -43,42 +44,51 @@ export const FinanceDataProvider = ({ children }: { children: ReactNode }) => {
   const [data, setDataState] = useState<FinanceData>(DEFAULT_DATA);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const timer = useRef<number | null>(null);
   const skipNextSave = useRef(true);
   const currentUserId = useRef<string | null>(null);
 
+  const userId = user?.id ?? null;
+
   // Chargement initial depuis Supabase à chaque changement d'utilisateur
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     let cancelled = false;
     setLoading(true);
     skipNextSave.current = true;
-    currentUserId.current = user.id;
+    currentUserId.current = userId;
 
     (async () => {
-      const { data: row, error } = await supabase
+      const { data: row, error: loadErr } = await supabase
         .from('finance_data')
         .select('data')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (cancelled) return;
 
-      if (error) {
-        console.error('Erreur chargement finance_data', error);
+      if (loadErr) {
+        console.error('Erreur chargement finance_data', loadErr);
+        setError(`Chargement impossible : ${loadErr.message}. Vérifie que la table finance_data existe et que les policies RLS sont en place.`);
         setDataState(DEFAULT_DATA);
         setLoading(false);
         return;
       }
 
-      if (row?.data) {
+      setError(null);
+      if (row?.data && Object.keys(row.data as object).length > 0) {
         setDataState(merge(row.data as Partial<FinanceData>));
       } else {
         // Première connexion : créer une ligne vide
         setDataState(DEFAULT_DATA);
-        await supabase
+        const { error: insErr } = await supabase
           .from('finance_data')
-          .insert({ user_id: user.id, data: DEFAULT_DATA });
+          .upsert({ user_id: userId, data: DEFAULT_DATA });
+        if (insErr) {
+          console.error('Erreur création ligne initiale', insErr);
+          setError(`Création impossible : ${insErr.message}`);
+        }
       }
       setLoading(false);
     })();
@@ -86,31 +96,36 @@ export const FinanceDataProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userId]);
 
   // Sauvegarde debounced à chaque modification
   useEffect(() => {
-    if (!user || loading) return;
+    if (!userId || loading) return;
     if (skipNextSave.current) {
       skipNextSave.current = false;
       return;
     }
-    if (currentUserId.current !== user.id) return;
+    if (currentUserId.current !== userId) return;
 
     if (timer.current) window.clearTimeout(timer.current);
     setSaving(true);
     timer.current = window.setTimeout(async () => {
-      const { error } = await supabase
+      const { error: saveErr } = await supabase
         .from('finance_data')
-        .upsert({ user_id: user.id, data, updated_at: new Date().toISOString() });
-      if (error) console.error('Erreur sauvegarde finance_data', error);
+        .upsert({ user_id: userId, data, updated_at: new Date().toISOString() });
+      if (saveErr) {
+        console.error('Erreur sauvegarde finance_data', saveErr);
+        setError(`Sauvegarde impossible : ${saveErr.message}`);
+      } else {
+        setError(null);
+      }
       setSaving(false);
     }, 500);
 
     return () => {
       if (timer.current) window.clearTimeout(timer.current);
     };
-  }, [data, user, loading]);
+  }, [data, userId, loading]);
 
   const setData = useCallback(
     (updater: (d: FinanceData) => FinanceData) => setDataState((d) => updater(d)),
@@ -119,16 +134,16 @@ export const FinanceDataProvider = ({ children }: { children: ReactNode }) => {
 
   const reset = useCallback(async () => {
     setDataState(DEFAULT_DATA);
-    if (user) {
+    if (userId) {
       await supabase
         .from('finance_data')
-        .upsert({ user_id: user.id, data: DEFAULT_DATA, updated_at: new Date().toISOString() });
+        .upsert({ user_id: userId, data: DEFAULT_DATA, updated_at: new Date().toISOString() });
     }
-  }, [user]);
+  }, [userId]);
 
   const value = useMemo(
-    () => ({ data, setData, loading, saving, reset }),
-    [data, setData, loading, saving, reset],
+    () => ({ data, setData, loading, saving, error, reset }),
+    [data, setData, loading, saving, error, reset],
   );
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
 };
